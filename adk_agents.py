@@ -22,6 +22,7 @@ False and the caller falls back to the direct rag_engine.query path.
 """
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import uuid
@@ -133,7 +134,7 @@ def check_clinical_safety(statement: str, known_allergies: str = "") -> dict:
 
 
 # ── Build the multi-agent system ─────────────────────────────────────────────
-import contextlib
+
 
 @contextlib.contextmanager
 def sandbox_vertex_env():
