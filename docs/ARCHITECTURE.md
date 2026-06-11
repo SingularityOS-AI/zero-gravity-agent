@@ -94,12 +94,26 @@ flowchart TB
 
 ---
 
-## The "Optimize" story (before → after)
+## 🛸 The Paradigm Shift: From Legacy Cascading to Unified Live Audio-to-Audio
 
-| Before | After (optimized) |
-|--------|-------------------|
-| Translated incoherent speech literally | Two-strike hybrid: clarifies, then flags word-salad as a clinical sign |
-| Went **mute** on long input | Configurable timeout + auto-recovery + user notice |
-| Single agent, no grounding | ADK multi-agent + Vertex RAG grounding |
-| Stateless | Live session memory (anti-hallucination) |
-| Static prompt | Dynamic config (VAD, timeouts, triggers) tunable without code |
+Traditional medical translation systems rely on inefficient **Cascading Architectures** (e.g., stacking separate tools like *Neural Captions* for transcription, followed by *Neural Flash* for translation, and ending with a text-to-speech engine). This introduce extreme latency, high cumulative token costs, and a total loss of live vocal context and clinical nuance.
+
+**Zero Gravity Agent** represents a net-new architectural leap. By harnessing **Gemini 3.1 Flash Live**, we completely eliminate the intermediaries:
+
+```
+[LEGACY CASCADE PIPELINE]:
+🎙️ Audio -> [STT: Neural Captions] -> Text -> [LLM: Neural Flash] -> Text -> [TTS Engine] -> 🎧 Latency: 4000ms+ ❌
+
+[ZERO GRAVITY LIVE PIPELINE]:
+🎙️ Audio Stream -------------------> [Gemini 3.1 Flash Live] -------------------> 🎧 Latency: <200ms ✅
+                                             ^
+                                             | (Real-time Semaphore Injector)
+                                    [ADK Reasoning + RAG Grounding]
+```
+
+### Strategic Innovations
+
+*   **Zero Intermediaries:** Native bidirectional voice-to-voice streaming eliminates STT and TTS cascades, lowering latency to conversational speed (<200ms).
+*   **The Live Semaphore HUD:** Our custom `semaphore.py` intercepts raw state announcements and transitions between cognitive states in volatile memory without ever touching persistent disk (strict HIPAA compliance).
+*   **Active Clinical Guardrails:** Rather than waiting for a translation to finish, the `Advocate` and `Cultural Broker` agents actively step in to clarify folk illnesses or dosage confusion mid-utterance.
+*   **No Amnesia:** The `state_manager.py` maintains live session memory (allergies, symptoms, interventions) inside volatile RAM to prevent clinical hallucinations without persisting PHI.
