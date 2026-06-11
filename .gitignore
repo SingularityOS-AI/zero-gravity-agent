@@ -1,0 +1,90 @@
+# Environment & secrets
+.env
+*.env
+*.key
+*.pem
+API KEY*.txt
+*API KEY*
+
+# Google service account keys (NEVER commit — would leak Vertex credentials)
+service-account.json
+singularityos-web-app-*.json
+*service_account*.json
+*-*.json.key
+
+# Python standard
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.ruff_cache/
+.mypy_cache/
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Scratch, logs & junk (keep public repo clean)
+New Text Document*.txt
+AUDITORIA.txt
+DEEP RESEARCH*.txt
+*.bat
+ZeroGravityAgent.spec
+policy.yaml
+be.txt
+bo.txt
+extracted_sections.txt
+scraped_details_raw.txt
+scraped_hackathon_raw.txt
+scraped_details.html
+scraped_hackathon.html
+warm-tumbling-waffle.md
+assets/*.png
+
+# Scrap python scripts & local developer tools
+scrape_devpost.py
+scrape_devpost_authenticated.py
+parse_details.py
+parse_tabs.py
+inspect_html.py
+verify_mcp_details.py
+scratch_*.py
+administrar_token_jurado.py
+qa_automation_runner.py
+
+# Heavy local-only material (NOT for the public repo)
+HACKATON/
+DEMO_LIVE_DINAMICO/
+ENTRENAMIENTO*/
+MASTER PROMPT NOTEBOOKLM/
+*.mp4
+
+# Internal audits, master prompts, and planning docs (keep private — not for judges' repo)
+docs/AUDITORIA_*.md
+docs/MASTER_PROMPT_ANTIGRAVITY.md
+docs/PLAN_5_DIAS.md
+docs/DEVPOST_SUBMISSION.md
+DEPLOY_ANTIGRAVITY.md
+DEPLOY_REDEPLOY.md
+TEST_LOCAL.md
+PLAN_DEFINITIVO.md
+DEPLOY_MASTER.md
+
+# Keep the PUBLIC repo's root docs to README.md only — every other root-level
+# .md is internal (audits, plans, handovers, deploy playbooks, video scripts) and
+# must never reach the judges' public repo. docs/*.md (architecture) stays tracked.
+/*.md
+!/README.md
+PLAN_MAESTRO_CLAUDE.md
+CLAUDE_CODE_AUDIT.md
+auditoría.md
+ESTADO_DEL_ARTE.md
+GUION_VIDEO_NOTEBOOKLM.md

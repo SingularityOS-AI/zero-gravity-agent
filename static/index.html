@@ -1,0 +1,2335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0">
+<meta name="theme-color" content="#070912">
+<title>Zero Gravity Agent — Medical Interpreter</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #070912;
+  --surface: #0f131f;
+  --surface2: #171c2b;
+  --border: #232a3d;
+  --accent: #6366f1;
+  --accent2: #818cf8;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --text: #edf1f8;
+  --muted: #94a3bd;
+  --radius: 14px;
+  --font-display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; color: var(--text);
+  font-family: var(--font-body); overflow: hidden;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+body {
+  display: flex; flex-direction: column; height: 100vh; height: 100dvh;
+  padding: 20px; max-width: 940px; margin: 0 auto;
+  background:
+    radial-gradient(1100px 560px at 50% -8%, rgba(99,102,241,.12), transparent 62%),
+    radial-gradient(900px 500px at 100% 110%, rgba(56,189,248,.06), transparent 60%),
+    var(--bg);
+  transition: max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+body.debug-open {
+  max-width: 1340px;
+}
+
+/* ── APP CONTAINER & SPLIT SYSTEM ── */
+.app-container {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  gap: 0;
+  transition: gap 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.main-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  gap: 16px;
+  overflow: hidden;
+}
+
+/* ── HIGH FIDELITY BADGES ── */
+.caption-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-left: 8px;
+  letter-spacing: 0.5px;
+}
+.badge-patient {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.badge-doctor {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+.badge-interpreter {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+/* ── HEADER ── */
+header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.logo { display: flex; align-items: center; gap: 12px; }
+.logo-icon {
+  width: 44px; height: 44px;
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  border-radius: 14px; display: flex; align-items: center; justify-content: center;
+  font-size: 22px; box-shadow: 0 0 20px rgba(99,102,241,.3); flex-shrink: 0;
+}
+.logo-name { font-family: var(--font-display); font-size: 19px; font-weight: 800; letter-spacing: -.4px; }
+.logo-sub { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .9px; margin-top: 2px; font-weight: 500; }
+.header-right { display: flex; align-items: center; gap: 8px; }
+.status-pill {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 14px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 999px; font-size: 12px; color: var(--muted);
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: all .3s; flex-shrink: 0; }
+.dot.online  { background: var(--success); box-shadow: 0 0 8px var(--success); animation: blink 2s ease-in-out infinite; }
+.dot.record  { background: var(--danger);  box-shadow: 0 0 8px var(--danger);  animation: blink .6s ease-in-out infinite; }
+.dot.think   { background: var(--warning); box-shadow: 0 0 8px var(--warning); animation: blink .8s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* Settings button */
+.settings-btn {
+  width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface); cursor: pointer; display: flex; align-items: center;
+  justify-content: center; font-size: 16px; transition: all .15s; color: var(--muted);
+}
+.settings-btn:hover { border-color: var(--accent); color: var(--accent2); }
+.settings-btn.active { border-color: var(--accent); color: var(--accent2); background: rgba(99,102,241,.1); }
+
+/* ── LANG STRIP ── */
+.lang-strip {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 20px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); flex-shrink: 0;
+}
+.lang-tag { padding: 4px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; letter-spacing: .4px; }
+.es { background: rgba(16,185,129,.12); color: #34d399; border: 1px solid rgba(16,185,129,.25); }
+.en { background: rgba(99,102,241,.12); color: #a5b4fc; border: 1px solid rgba(99,102,241,.25); }
+.arrow { color: var(--muted); font-size: 16px; }
+.mode-label { margin-left: auto; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+
+/* ── TRANSCRIPT ── */
+.transcript-wrap {
+  flex: 1; min-height: 0; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow-y: auto; padding: 16px; scroll-behavior: smooth;
+}
+.transcript-wrap::-webkit-scrollbar { width: 6px; }
+.transcript-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100%; gap: 10px; color: var(--muted); }
+.empty-icon { font-size: 40px; opacity: .25; }
+.empty-text { font-size: 14px; }
+.empty-hint { font-size: 12px; opacity: .6; }
+.entry { margin-bottom: 24px; animation: fadeUp .25s ease; transition: all .2s ease; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.entry-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin-bottom: 6px; font-weight: 700; }
+.entry-body {
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 8px solid var(--accent);
+  padding: 24px 30px;
+  border-radius: 0 20px 20px 0;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.5;
+  transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  color: #ffffff;
+  letter-spacing: -0.4px;
+}
+.entry-body:hover {
+  transform: translateX(6px);
+  box-shadow: 0 16px 48px rgba(99, 102, 241, 0.3);
+  border-left-color: var(--accent2);
+  font-size: 28px;
+  background: rgba(20, 30, 55, 0.65);
+}
+.entry-body.intervention {
+  border-left-color: var(--warning);
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.08);
+}
+.entry-body.intervention:hover {
+  border-left-color: #fbbf24;
+  box-shadow: 0 16px 48px rgba(245, 158, 11, 0.25);
+  font-size: 28px;
+}
+
+/* ── BOTTOM PANEL ── */
+.bottom {
+  flex-shrink: 0; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+}
+.intervention-banner {
+  display: none; width: 100%; align-items: center; gap: 8px;
+  padding: 9px 14px; background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.25);
+  border-radius: 8px; font-size: 13px; color: #fcd34d;
+}
+.intervention-banner.show { display: flex; }
+/* clarify-row removed — CLARIFIER uses auto-mic, not text input */
+.clarifier-mic-hint {
+  display: none; width: 100%; align-items: center; gap: 8px;
+  padding: 8px 14px; background: rgba(245,158,11,.05); border: 1px solid rgba(245,158,11,.2);
+  border-radius: 8px; font-size: 12px; color: #fbbf24; text-align: center;
+  justify-content: center; letter-spacing: .3px;
+}
+.clarifier-mic-hint.show { display: flex; }
+.viz-wrap { height: 28px; display: flex; align-items: center; }
+canvas#viz { display: block; }
+.ptt-btn {
+  width: 76px; height: 76px; border-radius: 50%; border: 3px solid var(--accent);
+  background: var(--surface2); cursor: pointer; display: flex; align-items: center;
+  justify-content: center; font-size: 28px; user-select: none; -webkit-user-select: none;
+  transition: all .15s ease; position: relative;
+}
+.ptt-btn::after {
+  content: ''; position: absolute; inset: -8px; border-radius: 50%;
+  border: 2px solid transparent; transition: all .15s ease;
+}
+.ptt-btn:hover:not(:disabled) { background: rgba(99,102,241,.1); }
+.ptt-btn.rec { background: rgba(239,68,68,.15); border-color: var(--danger); transform: scale(1.06);
+  box-shadow: 0 0 28px rgba(239,68,68,.35); }
+.ptt-btn.rec::after { border-color: rgba(239,68,68,.25); }
+.ptt-btn.thinking { border-color: var(--warning); box-shadow: 0 0 28px rgba(245,158,11,.3); animation: blink 1s infinite; }
+.ptt-btn.listening { border-color: var(--success); background: rgba(16,185,129,.08);
+  animation: listenPulse 2s ease-in-out infinite; }
+.ptt-btn.listening::after { border-color: rgba(16,185,129,.25); }
+@keyframes listenPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,.35); }
+  50%     { box-shadow: 0 0 0 10px rgba(16,185,129,0); }
+}
+.ptt-btn:disabled { opacity: .35; cursor: not-allowed; }
+.ptt-hint { font-size: 12px; color: var(--muted); text-align: center; }
+
+/* ── SEMAPHORE HUD ── */
+.semaphore-hud {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 20px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); flex-shrink: 0;
+}
+.semaphore-lights { display: flex; gap: 8px; }
+.sem-light {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 700;
+  letter-spacing: .6px; text-transform: uppercase; opacity: .3;
+  border: 1px solid transparent; transition: all .25s ease;
+}
+.sem-light.active { opacity: 1; }
+.sem-light.conduit        { background: rgba(16,185,129,.15); color:#34d399; border-color:rgba(16,185,129,.3); }
+.sem-light.clarifier      { background: rgba(245,158,11,.15); color:#fbbf24; border-color:rgba(245,158,11,.3); }
+.sem-light.cultural_broker{ background: rgba(139,92,246,.15); color:#a78bfa; border-color:rgba(139,92,246,.3); }
+.sem-light.researcher     { background: rgba(56,189,248,.15); color:#38bdf8; border-color:rgba(56,189,248,.35); }
+.sem-light.researcher.active { animation: researchPulse .9s ease-in-out infinite; }
+@keyframes researchPulse { 0%,100%{box-shadow:0 0 0 0 rgba(56,189,248,.35)} 50%{box-shadow:0 0 0 6px rgba(56,189,248,0)} }
+.sem-light.advocate       { background: rgba(239,68,68,.18);  color:#f87171; border-color:rgba(239,68,68,.35);
+  animation: advocatePulse .7s ease-in-out infinite; }
+@keyframes advocatePulse { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)} 50%{box-shadow:0 0 0 6px rgba(239,68,68,0)} }
+
+.scratchpad-toggle {
+  margin-left: auto; font-size: 11px; color: var(--muted); cursor: pointer;
+  display: flex; align-items: center; gap: 5px; user-select: none;
+  padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--surface2); transition: all .15s;
+}
+.scratchpad-toggle:hover { color: var(--text); border-color: var(--accent); }
+.scratchpad-panel {
+  display: none; width: 100%;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px; font-family: 'Courier New', monospace;
+  font-size: 11.5px; color: #94a3b8; line-height: 1.7; max-height: 120px;
+  overflow-y: auto; white-space: pre; flex-shrink: 0;
+}
+.scratchpad-panel.show { display: block; }
+.scratchpad-panel::-webkit-scrollbar { width: 4px; }
+.scratchpad-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── DEBUG CONSOLE (Sliding Left Sidebar Drawer) ── */
+#debugConsole {
+  position: fixed; top: 0; left: -420px; z-index: 1000; width: 400px; height: 100vh;
+  background: rgba(8,8,16,0.98); border-right: 1px solid var(--border);
+  font-family: 'Courier New', monospace; font-size: 11px;
+  display: flex; flex-direction: column;
+  box-shadow: 8px 0 32px rgba(0,0,0,0.5);
+  transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1), width 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, margin-right 0.3s ease;
+}
+#debugConsole.open {
+  left: 0;
+}
+
+@media (min-width: 1024px) {
+  #debugConsole {
+    position: static;
+    height: 100%;
+    width: 0;
+    min-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    border-right: none;
+    box-shadow: none;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+  }
+  #debugConsole.open {
+    width: 380px;
+    min-width: 380px;
+    opacity: 1;
+    margin-right: 20px;
+  }
+}
+#debugHeader {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; background: #0c0c14; border-bottom: 1px solid var(--border);
+  cursor: pointer; user-select: none;
+}
+#debugHeader span { color: #6366f1; font-weight: bold; font-size: 11px; letter-spacing: 1.2px; }
+#debugHeader small { color: var(--muted); font-size: 10px; }
+#debugBody { overflow-y: auto; padding: 16px 20px; flex: 1; }
+#debugBody::-webkit-scrollbar { width: 5px; }
+#debugBody::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+.dlog { padding: 4px 0; border-bottom: 1px solid #151520; line-height: 1.6; }
+.dlog .ts { color: #444; margin-right: 6px; font-size: 9px; }
+.dlog.info .msg { color: #94a3b8; }
+.dlog.error .msg { color: #f87171; font-weight: 600; }
+.dlog.warn .msg { color: #fbbf24; }
+
+/* ── SETTINGS PANEL ── */
+.settings-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6);
+  z-index: 100; backdrop-filter: blur(4px);
+}
+.settings-overlay.show { display: flex; align-items: center; justify-content: center; }
+.settings-panel {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  width: min(680px, 96vw); max-height: 90vh; overflow-y: auto;
+  padding: 28px; display: flex; flex-direction: column; gap: 20px;
+  animation: panelIn .2s ease;
+}
+@keyframes panelIn { from{opacity:0;transform:scale(.97)} to{opacity:1;transform:scale(1)} }
+.settings-header { display: flex; align-items: center; justify-content: space-between; }
+.settings-title { font-size: 16px; font-weight: 700; }
+.settings-close { background: none; border: none; color: var(--muted); font-size: 20px;
+  cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+.settings-close:hover { color: var(--text); background: var(--surface2); }
+
+.field { display: flex; flex-direction: column; gap: 8px; }
+.field-label { font-size: 12px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .8px; color: var(--muted); }
+.field-hint { font-size: 12px; color: var(--muted); margin-top: -4px; }
+
+.voice-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.voice-opt {
+  padding: 10px; background: var(--surface2); border: 2px solid var(--border);
+  border-radius: 10px; cursor: pointer; text-align: center; font-size: 13px;
+  font-weight: 600; transition: all .15s; user-select: none;
+}
+.voice-opt:hover { border-color: var(--accent2); }
+.voice-opt.selected { border-color: var(--accent); background: rgba(99,102,241,.12); color: var(--accent2); }
+
+/* ── DYNAMIC TUNING CONTROLS ── */
+.tuning-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+.tune-row { display: flex; flex-direction: column; gap: 5px; }
+.tune-label { font-size: 12.5px; font-weight: 600; color: var(--text); display: flex; justify-content: space-between; align-items: center; }
+.tune-label small { color: var(--accent2); font-weight: 700; font-size: 12px; }
+.tune-hint { font-size: 10.5px; color: var(--muted); }
+.tune-row input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+.tune-select {
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 7px 10px; font-size: 12.5px; outline: none; cursor: pointer;
+}
+.tune-select:focus { border-color: var(--accent); }
+.trigger-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.trig-row { display: flex; flex-direction: column; gap: 4px; }
+.trig-row span { font-size: 11px; font-weight: 600; color: var(--muted); }
+.trig-row input {
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 7px 10px; font-size: 12px; outline: none;
+}
+.trig-row input:focus { border-color: var(--accent); }
+
+.prompt-textarea {
+  width: 100%; min-height: 260px; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px; font-size: 13px; color: var(--text); font-family: inherit;
+  line-height: 1.6; outline: none; resize: vertical;
+}
+.prompt-textarea:focus { border-color: var(--accent); }
+
+.char-count { font-size: 11px; color: var(--muted); text-align: right; margin-top: -4px; }
+
+.prompt-presets { display: flex; gap: 8px; flex-wrap: wrap; }
+.preset-btn {
+  padding: 6px 12px; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; font-size: 12px; cursor: pointer; color: var(--text); transition: all .15s;
+}
+.preset-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+.settings-actions { display: flex; gap: 10px; justify-content: flex-end; padding-top: 4px; }
+.btn-secondary {
+  padding: 10px 20px; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--muted); font-size: 14px; cursor: pointer;
+}
+.btn-secondary:hover { border-color: var(--border); color: var(--text); }
+.btn-primary {
+  padding: 10px 24px; background: var(--accent); border: none; border-radius: 10px;
+  color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.btn-primary:hover { background: var(--accent2); }
+
+/* ── DEMO PANEL ── */
+.demo-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.65);
+  z-index: 2000; backdrop-filter: blur(6px);
+}
+.demo-overlay.show { display: flex; align-items: flex-end; justify-content: center; }
+.demo-panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px 20px 0 0; width: min(860px, 100vw);
+  max-height: 80vh; overflow-y: auto; padding: 24px 24px 32px;
+  display: flex; flex-direction: column; gap: 16px;
+  animation: slideUp .25s cubic-bezier(.16,1,.3,1);
+}
+@keyframes slideUp { from{transform:translateY(40px);opacity:0} to{transform:none;opacity:1} }
+.demo-panel-header { display: flex; align-items: center; justify-content: space-between; }
+.demo-panel-title { font-size: 15px; font-weight: 700; }
+.demo-panel-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.demo-close-btn { background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--muted); font-size: 16px; cursor: pointer;
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+.demo-close-btn:hover { color: var(--text); }
+.demo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.demo-card {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px; cursor: pointer; transition: all .15s;
+  position: relative; overflow: hidden;
+}
+.demo-card::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--dc, var(--accent)); opacity: 0; transition: opacity .15s;
+}
+.demo-card:hover { border-color: var(--dc, var(--accent)); background: rgba(255,255,255,.03); }
+.demo-card:hover::before { opacity: 1; }
+.demo-card.selected { border-color: var(--dc, var(--accent)); }
+.demo-card.selected::before { opacity: 1; }
+.demo-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.demo-card-emoji { font-size: 18px; }
+.demo-card-label { font-size: 13px; font-weight: 600; line-height: 1.3; }
+.demo-card-patient { font-size: 11px; color: var(--muted); }
+.expect-badge { font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 6px;
+  border: 1px solid; letter-spacing: .4px; vertical-align: middle; white-space: nowrap; }
+.demo-card-script { font-size: 11.5px; color: #94a3b8; line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.demo-run-row { display: flex; gap: 10px; align-items: center; padding-top: 4px; border-top: 1px solid var(--border); }
+.demo-run-btn {
+  flex: 1; padding: 12px; border-radius: 10px; border: none;
+  background: linear-gradient(135deg, #6366f1, #a855f7); color: white;
+  font-size: 14px; font-weight: 700; cursor: pointer; transition: all .15s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.demo-run-btn:disabled { opacity: .4; cursor: not-allowed; }
+.demo-run-btn:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,.4); }
+.demo-run-btn.running { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.demo-selected-info { font-size: 12px; color: var(--muted); }
+.demo-btn {
+  width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface); cursor: pointer; display: flex; align-items: center;
+  justify-content: center; font-size: 15px; transition: all .15s; color: var(--muted);
+}
+.demo-btn:hover { border-color: var(--accent); color: var(--accent2); }
+.demo-btn.active { border-color: var(--accent); color: var(--accent2); background: rgba(99,102,241,.1); }
+
+/* ── SSO LOGIN OVERLAY ── */
+.sso-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 4, 8, 0.88);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sso-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.sso-card {
+  background: linear-gradient(145deg, rgba(16, 16, 26, 0.8) 0%, rgba(24, 24, 42, 0.7) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 24px;
+  width: min(440px, 92vw);
+  padding: 44px 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 
+              0 0 40px rgba(99, 102, 241, 0.18);
+  transform: translateY(20px);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sso-overlay.show .sso-card {
+  transform: translateY(0);
+}
+.sso-logo {
+  width: 76px;
+  height: 76px;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #db2777 100%);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 38px;
+  margin-bottom: 26px;
+  box-shadow: 0 0 35px rgba(99, 102, 241, 0.45);
+  position: relative;
+  animation: ssoPulse 3s infinite ease-in-out;
+}
+@keyframes ssoPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 30px rgba(99, 102, 241, 0.4); }
+  50% { transform: scale(1.04); box-shadow: 0 0 45px rgba(124, 58, 237, 0.6); }
+}
+.sso-title {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  background: linear-gradient(to right, #ffffff, #c7d2fe);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 10px;
+}
+.sso-sub {
+  font-size: 13.5px;
+  color: #94a3b8;
+  line-height: 1.6;
+  margin-bottom: 34px;
+  max-width: 320px;
+}
+.g-btn-wrapper {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+.sso-footer {
+  margin-top: 36px;
+  font-size: 10.5px;
+  color: #475569;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+.sso-footer span {
+  color: #6366f1;
+  font-weight: 600;
+}
+.sso-divider {
+  width: 100%;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  line-height: 0.1em;
+  margin: 28px 0;
+  font-size: 11px;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+.sso-divider span {
+  background: rgb(20, 20, 35);
+  padding: 0 14px;
+}
+.sso-input-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+.sso-input {
+  background: rgba(2, 2, 4, 0.6);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 14px;
+  outline: none;
+  font-family: inherit;
+  text-align: center;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+.sso-input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.35), inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+.sso-btn {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  border: none;
+  border-radius: 12px;
+  color: #ffffff;
+  padding: 12px 24px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+}
+.sso-btn:hover {
+  background: linear-gradient(135deg, #5a52ff 0%, #8b4eff 100%);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+  transform: translateY(-1px);
+}
+.sso-btn:active {
+  transform: translateY(1px);
+}
+
+/* ── USER PROFILE WIDGET (HEADER) ── */
+.user-profile {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition: all 0.2s ease;
+  margin-right: 4px;
+}
+.user-profile.show {
+  display: flex;
+}
+.user-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  background-size: cover;
+  background-position: center;
+}
+.user-email {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-logout {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 11.5px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s;
+  font-weight: bold;
+}
+.user-logout:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Cohesive display font on panel titles */
+.settings-title, .sso-title, .demo-panel-title { font-family: var(--font-display); letter-spacing: -.3px; }
+/* Crisper transcript reading */
+.entry-body { font-size: 20px; }
+.empty-text { font-size: 15px; }
+
+/* ════════════════════════════════════════════════════════════
+   RESPONSIVE — phone / tablet. Only overrides on small screens;
+   desktop layout is untouched. Fixes the hidden mic on Android,
+   tiny text, and the off-screen debug console.
+   ════════════════════════════════════════════════════════════ */
+
+/* Tablet */
+@media (max-width: 920px) {
+  body { padding: 16px; gap: 12px; }
+  #debugConsole { width: min(360px, calc(100vw - 24px)); }
+}
+
+/* Phone */
+@media (max-width: 640px) {
+  body { padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); gap: 9px; }
+
+  /* Header compact */
+  header { flex-wrap: wrap; gap: 8px 6px; }
+  .logo-icon { width: 38px; height: 38px; font-size: 18px; border-radius: 11px; }
+  .logo-name { font-size: 16px; }
+  .logo-sub { display: none; }
+  .header-right { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .status-pill { padding: 5px 10px; font-size: 11px; }
+  #ragTxt { display: none; }                 /* keep the colored dot, drop label */
+  .user-email { max-width: 96px; }
+
+  /* Language strip slim */
+  .lang-strip { padding: 8px 12px; gap: 10px; }
+  .mode-label { display: none; }
+
+  /* Semaphore HUD → horizontal scroll, never overflow */
+  .semaphore-hud { padding: 8px 10px; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+  .semaphore-hud::-webkit-scrollbar { display: none; }
+  .semaphore-lights { gap: 6px; flex-wrap: nowrap; }
+  .sem-light { font-size: 9.5px; padding: 5px 9px; white-space: nowrap; flex-shrink: 0; }
+  .scratchpad-toggle { flex-shrink: 0; }
+
+  /* Transcript readable */
+  .transcript-wrap { padding: 13px; }
+  .entry-body { font-size: 17px; line-height: 1.5; }
+
+  /* Bottom panel — PTT ALWAYS visible, big touch target */
+  .bottom { padding: 14px 14px calc(16px + env(safe-area-inset-bottom)); gap: 10px; }
+  .ptt-btn { width: 88px; height: 88px; font-size: 34px; border-width: 3px; }
+  .ptt-hint { font-size: 13px; }
+  .viz-wrap { height: 22px; }
+
+  /* Debug console = dev tool. Hide on phone so it never covers the mic. */
+  #debugConsole { display: none; }
+
+  /* Settings & demo panels → full screen, single column */
+  .settings-panel { width: 100vw; max-height: 100dvh; height: 100dvh; border-radius: 0; padding: 20px 16px; }
+  .voice-grid { grid-template-columns: repeat(2, 1fr); }
+  .tuning-grid { grid-template-columns: 1fr; }
+  .trigger-grid { grid-template-columns: 1fr; }
+  .demo-panel { width: 100vw; max-height: 88vh; padding: 18px 14px 26px; }
+  .demo-grid { grid-template-columns: 1fr; }
+
+  /* SSO card fits small screens */
+  .sso-card { padding: 34px 24px; }
+  .sso-title { font-size: 22px; }
+}
+
+/* Very small phones */
+@media (max-width: 380px) {
+  .sem-light { font-size: 9px; padding: 4px 7px; }
+  .ptt-btn { width: 80px; height: 80px; }
+  .status-pill { padding: 4px 8px; }
+}
+
+/* Landscape phone — keep PTT reachable */
+@media (max-height: 480px) and (orientation: landscape) {
+  body { padding: 8px; gap: 6px; }
+  .ptt-btn { width: 60px; height: 60px; font-size: 24px; }
+  .lang-strip, .semaphore-hud { padding: 6px 10px; }
+}
+</style>
+</head>
+<body>
+
+<div class="app-container">
+  <!-- ── DEBUG CONSOLE (Moved to Left Side) ── -->
+  <div id="debugConsole">
+    <div id="debugHeader" onclick="toggleDebug()">
+      <span>⚡ SYSTEM LOGS</span>
+      <small id="debugToggleHint">⚡ Click to view logs</small>
+    </div>
+    <div id="debugBody"></div>
+  </div>
+
+  <div class="main-panel">
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚕️</div>
+    <div>
+      <div class="logo-name">Zero Gravity Agent</div>
+      <div class="logo-sub">HIPAA Medical Interpreter · Gemini 3.1 Flash Live</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="user-profile" id="userProfile">
+      <div class="user-avatar" id="userAvatar"></div>
+      <span class="user-email" id="userEmail"></span>
+      <button class="user-logout" id="userLogout" title="Log Out">Log Out</button>
+    </div>
+    <button class="demo-btn" id="demoBtn" title="Run patient scenario demo">🎭</button>
+    <button class="settings-btn" id="settingsBtn" title="Configure agent behavior">⚙️</button>
+    <button class="settings-btn" id="debugBtn" title="Toggle System Logs" onclick="toggleDebug()">⚡</button>
+    <div class="status-pill" id="ragPill" title="Vertex RAG Knowledge Base Status (RESEARCHER)">
+      <div class="dot" id="ragDot"></div>
+      <span id="ragTxt">RAG…</span>
+    </div>
+    <div class="status-pill">
+      <div class="dot" id="dot"></div>
+      <span id="statusTxt">Connecting…</span>
+    </div>
+  </div>
+</header>
+
+<div class="lang-strip">
+  <span class="lang-tag es">🇪🇸 Spanish</span>
+  <span class="arrow">→</span>
+  <span class="lang-tag en">🇺🇸 English</span>
+  <span class="mode-label">Consecutive</span>
+</div>
+
+<div class="semaphore-hud" id="semaphoreHud">
+  <div class="semaphore-lights">
+    <div class="sem-light conduit active" id="semConduit">● CONDUIT</div>
+    <div class="sem-light clarifier"       id="semClarifier">● CLARIFIER</div>
+    <div class="sem-light cultural_broker" id="semCultural">● CULTURAL BROKER</div>
+    <div class="sem-light researcher"      id="semResearcher">● RESEARCHER</div>
+    <div class="sem-light advocate"        id="semAdvocate">● ADVOCATE</div>
+  </div>
+  <button class="scratchpad-toggle" id="scratchpadToggle">📋 Scratchpad ▾</button>
+</div>
+<pre class="scratchpad-panel" id="scratchpadPanel">🆔 Session — · Turn 0
+🚦 Current state: CONDUIT (listening)
+🚨 Allergies: none reported</pre>
+
+<div class="transcript-wrap" id="txWrap">
+  <div class="empty-state" id="emptyState">
+    <div class="empty-icon">🎙️</div>
+    <div class="empty-text">Hold the button and speak Spanish</div>
+    <div class="empty-hint">Release to interpret · Space bar also works</div>
+  </div>
+</div>
+
+<div class="bottom">
+  <div class="intervention-banner" id="ivBanner">
+    ⚠️ <span id="ivText">Zero Gravity intervening…</span>
+  </div>
+  <div class="clarifier-mic-hint" id="clarifierMicHint">
+    🎤 Mic opens automatically — speak to clarify · release when done
+  </div>
+  <div class="viz-wrap"><canvas id="viz" width="220" height="28"></canvas></div>
+  <button class="ptt-btn" id="pttBtn" disabled>🎤</button>
+  <div class="ptt-hint" id="pttHint">Press to start interpreting session</div>
+</div>
+
+  </div> <!-- closes main-panel -->
+
+</div> <!-- closes app-container -->
+
+<!-- ── SETTINGS OVERLAY ── -->
+<div class="settings-overlay" id="settingsOverlay">
+  <div class="settings-panel">
+    <div class="settings-header">
+      <div class="settings-title">⚙️ Agent Configuration</div>
+      <button class="settings-close" id="settingsClose">✕</button>
+    </div>
+
+    <div class="field">
+      <div class="field-label">Voice</div>
+      <div class="field-hint">Choose the interpreter's voice — reconnects automatically on save. One voice for everything: interpretations, clarifications, and safety alerts.</div>
+      <div class="voice-grid" id="voiceGrid" style="grid-template-columns: repeat(2, 1fr)">
+        <div class="voice-opt selected" data-voice="Charon">🧑 Charon — Male</div>
+        <div class="voice-opt" data-voice="Aoede">👩 Aoede — Female</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="field-label">🔒 Black Box Mode</div>
+      <div class="field-hint">
+        This agent is sealed for production. Interpretation pause: <b>2 seconds</b>.
+        Incoherence handling: <b>Hybrid</b> (asks first when unsure, otherwise translates
+        faithfully respecting cross-language semantics — NCIHC Full Standard).
+        All safety parameters are factory-calibrated and cannot be misconfigured.
+      </div>
+    </div>
+
+    <div class="settings-actions">
+      <button class="btn-secondary" id="settingsCancel">Cancel</button>
+      <button class="btn-primary" id="settingsSave">Save &amp; Reconnect</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── DEMO PANEL ── -->
+<div class="demo-overlay" id="demoOverlay">
+  <div class="demo-panel">
+    <div class="demo-panel-header">
+      <div>
+        <div class="demo-panel-title">🎭 Patient Scenarios — Live Demo</div>
+        <div class="demo-panel-sub">Select a patient scenario · the agent interprets in real time</div>
+      </div>
+      <button class="demo-close-btn" id="demoClose">✕</button>
+    </div>
+    <div class="demo-grid" id="demoGrid">
+      <div style="color:var(--muted);font-size:13px;grid-column:1/-1">Loading scenarios…</div>
+    </div>
+    <div class="demo-run-row">
+      <div class="demo-selected-info" id="demoSelectedInfo">← Select a scenario</div>
+      <button class="demo-run-btn" id="demoRunBtn" disabled>▶ &nbsp;Run Demo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── GLASSMORPHIC SSO OVERLAY ── -->
+<div class="sso-overlay" id="ssoOverlay">
+  <div class="sso-card">
+    <div class="sso-logo">⚕️</div>
+    <h2 class="sso-title">Zero Gravity Portal</h2>
+    <p class="sso-sub">Sovereign & secure access for elite consecutive medical interpretation. Log in with Google.</p>
+    <div class="g-btn-wrapper">
+      <div id="gSignInBtn"></div>
+    </div>
+    <div class="sso-divider"><span>OR</span></div>
+    <div class="sso-input-wrapper">
+      <input type="password" id="ssoJudgeInput" class="sso-input" placeholder="Enter Judge Secret Token...">
+      <button id="ssoJudgeBtn" class="sso-btn">Verify & Connect</button>
+      <div id="ssoJudgeError" style="font-size:11px;color:var(--danger);margin-top:4px;min-height:16px;"></div>
+    </div>
+    <div class="sso-footer">Sovereign · <span>SingularityOS AI</span></div>
+  </div>
+</div>
+
+<script>
+// ── Debug Console ─────────────────────────────────────────────────────────
+const debugBody = document.getElementById('debugBody');
+let debugCollapsed = true;  // Start collapsed for cleaner demo UI
+const MAX_LOG_LINES = 100;  // Increased capacity for production debugging
+
+function toggleDebug() {
+  debugCollapsed = !debugCollapsed;
+  const consoleEl = document.getElementById('debugConsole');
+  consoleEl.classList.toggle('open', !debugCollapsed);
+  document.body.classList.toggle('debug-open', !debugCollapsed);
+  const debugBtn = document.getElementById('debugBtn');
+  if (debugBtn) debugBtn.classList.toggle('active', !debugCollapsed);
+  document.getElementById('debugToggleHint').textContent = debugCollapsed ? '⚡ Click to view logs' : '✕ Close';
+  if (!debugCollapsed) {
+    debugBody.scrollTop = debugBody.scrollHeight;
+  }
+}
+
+// Initialize collapsed state
+// No longer need to hide debugBody itself as the entire sidebar container is hidden off-screen
+
+function dblog(msg, level = 'info') {
+  const now = new Date();
+  const ts = now.toTimeString().slice(0,8) + '.' + String(now.getMilliseconds()).padStart(3,'0');
+  const el = document.createElement('div');
+  el.className = `dlog ${level}`;
+  el.innerHTML = `<span class="ts">${ts}</span><span class="msg">${msg.replace(/</g,'&lt;')}</span>`;
+  debugBody.appendChild(el);
+  while (debugBody.children.length > MAX_LOG_LINES) debugBody.removeChild(debugBody.firstChild);
+  if (!debugCollapsed) debugBody.scrollTop = debugBody.scrollHeight;
+  console.log(`[ZG ${level.toUpperCase()}]`, msg);
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────
+const RATE_IN  = 16000;
+const RATE_OUT = 24000;
+// Output loudness: Gemini's raw audio is quiet on phone speakers. We run playback
+// through a compressor + makeup gain so the interpretation is clearly audible
+// without clipping. Raise OUTPUT_GAIN if still too low (3.0 ≈ +9.5 dB).
+const OUTPUT_GAIN = 3.0;
+const BARS = 22;
+
+// BLACK BOX: system prompt is fixed server-side (NCIHC Full Standard).
+
+// ── Semaphore HUD ─────────────────────────────────────────────────────────
+const SEM_IDS = {
+  CONDUIT:        'semConduit',
+  CLARIFIER:      'semClarifier',
+  CULTURAL_BROKER:'semCultural',
+  RESEARCHER:     'semResearcher',
+  ADVOCATE:       'semAdvocate',
+};
+let currentRole = 'CONDUIT';
+
+function updateSemaphore(role, sessionMemory) {
+  if (!role) return;
+  currentRole = role;
+
+  // Toggle active light
+  Object.entries(SEM_IDS).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', key === role);
+  });
+
+  // Update scratchpad (human-readable)
+  if (sessionMemory) renderScratchpad(sessionMemory);
+}
+
+// ── Human-readable clinical scratchpad ──────────────────────────────────────
+// Plain sentences instead of raw JSON — readable by judges, clinicians, and CEOs.
+function renderScratchpad(m) {
+  const panel = document.getElementById('scratchpadPanel');
+  if (!panel || !m) return;
+  const lines = [];
+  lines.push(`🆔 Session ${m.session_id || '—'} · Turn ${m.turn_count ?? 0}`);
+  lines.push(`🚦 Current state: ${m.current_locked_state || 'CONDUIT (listening)'}`);
+  lines.push(m.allergies?.length
+    ? `🚨 Allergies: ${m.allergies.join(', ')}`
+    : '🚨 Allergies: none reported');
+  if (m.symptoms?.length)    lines.push(`🩺 Symptoms: ${m.symptoms.join(', ')}`);
+  if (m.medications?.length) lines.push(`💊 Medications mentioned: ${m.medications.join(', ')}`);
+  if (m.cultural_terms?.length) lines.push(`🌿 Cultural terms: ${m.cultural_terms.join(', ')}`);
+  if (m.clarified_terms?.length)
+    lines.push(`📖 Clarified: ${m.clarified_terms.map(t => `"${t.term}" → ${t.meaning || 'confirmed'}`).join(' · ')}`);
+  if (m.interventions?.length)
+    lines.push(`⚡ Interventions: ${m.interventions.map(i => i.state).join(' → ')}`);
+  if (m.pending_clarification_phrase)
+    lines.push(`⏳ Awaiting clarification of: "${m.pending_clarification_phrase}"`);
+  panel.textContent = lines.join(String.fromCharCode(10));
+}
+
+// Scratchpad toggle
+document.getElementById('scratchpadToggle').addEventListener('click', () => {
+  const panel = document.getElementById('scratchpadPanel');
+  const btn   = document.getElementById('scratchpadToggle');
+  const open  = panel.classList.toggle('show');
+  btn.textContent = open ? '📋 Scratchpad ▴' : '📋 Scratchpad ▾';
+});
+
+// ── State ─────────────────────────────────────────────────────────────────
+let ws         = null;
+// Judge access: if the page is opened as …/?judge_token=SECRET the judge gets full
+// LIVE access with NO login. We read it once and attach it to every WS connection.
+let judgeToken = new URLSearchParams(location.search).get('judge_token') || '';
+let captureCtx = null;
+let playCtx    = null;
+let worklet    = null;
+let analyser   = null;
+let nextPlay   = 0;
+let isThinking = false;
+let ready      = false;
+let currentVoice  = 'Charon';
+
+// Semaphore telemetry: tracks the role of the LAST completed interpretation.
+// Used to:
+//  a) Keep the badge showing the correct state (not overwritten by turn_complete reset)
+//  b) Trigger auto-mic when CLARIFIER intervention just completed
+let lastTranscriptRole = 'CONDUIT';
+
+// ── DOM ────────────────────────────────────────────────────────────────────
+const dot              = document.getElementById('dot');
+const statusTxt        = document.getElementById('statusTxt');
+const txWrap           = document.getElementById('txWrap');
+const ivBanner         = document.getElementById('ivBanner');
+const ivText           = document.getElementById('ivText');
+const clarifierMicHint = document.getElementById('clarifierMicHint');
+const pttBtn           = document.getElementById('pttBtn');
+const pttHint     = document.getElementById('pttHint');
+const vizCanvas   = document.getElementById('viz');
+const vizCtx2d    = vizCanvas.getContext('2d');
+const settingsBtn     = document.getElementById('settingsBtn');
+const settingsOverlay = document.getElementById('settingsOverlay');
+const settingsClose   = document.getElementById('settingsClose');
+const settingsCancel  = document.getElementById('settingsCancel');
+const settingsSave    = document.getElementById('settingsSave');
+const voiceGrid       = document.getElementById('voiceGrid');
+
+// ── Status ────────────────────────────────────────────────────────────────
+function setStatus(state, text) {
+  statusTxt.textContent = text;
+  dot.className = 'dot ' + ({ online:'online', rec:'record', think:'think' }[state] || '');
+}
+
+// ── SSO Helpers & State ───────────────────────────────────────────────────
+let googleClientId = null;
+
+function parseJwt(token) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(c => {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch(e) {
+    return null;
+  }
+}
+
+async function fetchConfig() {
+  try {
+    const res = await fetch('/api/config');
+    const data = await res.json();
+    googleClientId = data.google_client_id;
+    dblog(`Backend configuration loaded. Client ID: ${googleClientId ? 'Configured' : 'Not configured'}`);
+  } catch (e) {
+    dblog(`Error loading backend config: ${e}`, 'error');
+  }
+}
+
+// Runtime config (VAD timing + timeouts) — loaded from backend config.json.
+// Safe defaults so the agent works even if the fetch fails.
+let runtimeConfig = {
+  vad: { silence_ms: 2000, onset_ms: 180, abs_floor: 0.012, noise_mult: 3.2, min_utter_ms: 300 },
+  timeouts: { interpret_timeout_s: 25 },
+  recovery: { notify_on_mute: true, long_input_warning: true },
+  nonsense_handling: 'hybrid',
+};
+
+async function fetchRuntimeConfig() {
+  try {
+    const res = await fetch('/api/runtime-config');
+    const cfg = await res.json();
+    if (cfg && cfg.vad) runtimeConfig = { ...runtimeConfig, ...cfg };
+    dblog(`⚙️ Config: VAD silence=${runtimeConfig.vad.silence_ms}ms · timeout=${runtimeConfig.timeouts.interpret_timeout_s}s · nonsense=${runtimeConfig.nonsense_handling}`);
+    applyVadConfigToWorklet();
+  } catch (e) {
+    dblog(`⚠️ No se pudo cargar runtime-config (usando defaults): ${e}`, 'warn');
+  }
+}
+
+// Push current VAD tuning into the live worklet (safe if worklet not ready yet).
+function applyVadConfigToWorklet() {
+  if (!worklet) return;
+  const v = runtimeConfig.vad || {};
+  worklet.port.postMessage({
+    type: 'config',
+    silenceMs: v.silence_ms,
+    onsetMs: v.onset_ms,
+    absFloor: v.abs_floor,
+    noiseMult: v.noise_mult,
+    maxUtterMs: v.max_utterance_ms,
+  });
+}
+
+async function fetchRagStatus() {
+  const dot = document.getElementById('ragDot');
+  const txt = document.getElementById('ragTxt');
+  try {
+    const res = await fetch('/api/rag-status');
+    const s = await res.json();
+    if (s.available) {
+      dot.className = 'dot online';
+      txt.textContent = 'RAG Online';
+      document.getElementById('ragPill').title = `Knowledge base online — corpus: ${s.corpus}`;
+      dblog(`🔬 RESEARCHER online — corpus: ${s.corpus}`);
+    } else {
+      dot.className = 'dot';
+      txt.textContent = 'RAG Offline';
+      document.getElementById('ragPill').title = `RESEARCHER offline — ${s.error}. El agente interpreta normal.`;
+      dblog(`🔬 RESEARCHER offline — ${s.error}`, 'warn');
+    }
+  } catch (e) {
+    dot.className = 'dot';
+    txt.textContent = 'RAG ?';
+    dblog(`Error consultando estado RAG: ${e}`, 'warn');
+  }
+}
+
+function handleCredentialResponse(response) {
+  const cred = response.credential;
+  const payload = parseJwt(cred);
+  if (!payload) {
+    dblog('Error decoding Google token', 'error');
+    return;
+  }
+  const email = payload.email.toLowerCase().trim();
+  const allowedEmails = ['gabriel@singularityos-ai.com', 'gabobustos382@gmail.com'];
+  if (!allowedEmails.includes(email)) {
+    dblog(`Unauthorized email attempted access: ${email}`, 'warn');
+    alert(`Access denied: ${email} is not in the authorized personnel list.`);
+    return;
+  }
+
+  dblog(`Frontend auth successful for: ${email}`);
+  localStorage.setItem('sso_token', cred);
+  
+  document.getElementById('ssoOverlay').classList.remove('show');
+  showProfile(payload);
+  
+  connectWithToken(cred);
+}
+
+function showProfile(payload) {
+  const pEl = document.getElementById('userProfile');
+  const av = document.getElementById('userAvatar');
+  const em = document.getElementById('userEmail');
+  if (payload && payload.picture) {
+    av.style.backgroundImage = `url(${payload.picture})`;
+  } else {
+    av.style.backgroundImage = 'none';
+    av.textContent = '👤';
+    av.style.display = 'flex';
+    av.style.alignItems = 'center';
+    av.style.justifyContent = 'center';
+  }
+  em.textContent = payload ? payload.email : '';
+  pEl.classList.add('show');
+}
+
+function logout() {
+  dblog('Signing out user (clearing all tokens)');
+  localStorage.removeItem('sso_token');
+  localStorage.removeItem('judge_token');
+  judgeToken = '';
+  document.getElementById('userProfile').classList.remove('show');
+  if (ws) {
+    try { ws.close(); } catch(e){}
+  }
+  setTimeout(() => { location.reload(); }, 100);
+}
+
+document.getElementById('userLogout').addEventListener('click', logout);
+
+// ── Judge Secret Token Manual Entry Event Handlers ───────────────────────
+document.getElementById('ssoJudgeBtn').addEventListener('click', () => {
+  const input = document.getElementById('ssoJudgeInput').value.trim();
+  if (!input) {
+    document.getElementById('ssoJudgeError').textContent = 'Please enter a token';
+    return;
+  }
+  document.getElementById('ssoJudgeError').textContent = '';
+  dblog(`🔑 Judge token entered manually. Saving to storage & connecting.`);
+  localStorage.setItem('judge_token', input);
+  judgeToken = input;
+  document.getElementById('ssoOverlay').classList.remove('show');
+  showProfile({ email: 'Judge Environment', picture: null });
+  connectWithToken(null);
+});
+
+document.getElementById('ssoJudgeInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    document.getElementById('ssoJudgeBtn').click();
+  }
+});
+
+// ── WebSocket ─────────────────────────────────────────────────────────────
+function connectWithToken(token) {
+  // Kill any stale socket FIRST and detach its handlers, so its onclose can't
+  // fire and wipe the saved credentials / re-open the login (the double-login bug).
+  if (ws) {
+    try {
+      ws.onclose = null; ws.onerror = null; ws.onmessage = null; ws.onopen = null;
+      ws.close();
+    } catch (e) { /* ignore */ }
+    ws = null;
+  }
+
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const parts = [];
+  if (token)      parts.push(`token=${encodeURIComponent(token)}`);
+  if (judgeToken) parts.push(`judge_token=${encodeURIComponent(judgeToken)}`);
+  const query = parts.length ? `?${parts.join('&')}` : '';
+  ws = new WebSocket(`${proto}//${location.host}/ws${query}`);
+  ws.binaryType = 'arraybuffer';
+
+  ws.onopen = () => {
+    dblog('WS conectado → enviando config');
+    setStatus('', 'Establishing session…');
+    ws.send(JSON.stringify({
+      type: 'config',
+      voice: currentVoice,
+    }));
+  };
+
+  ws.onclose = (e) => {
+    dblog(`WS cerrado — code:${e.code} reason:${e.reason || 'none'}`, 'warn');
+    setStatus('', 'Reconnecting…');
+    ready = false; pttBtn.disabled = true;
+    
+    if (e.code === 4003) {
+      dblog('Token o credenciales rechazadas por el servidor. Limpiando y mostrando login.', 'error');
+      localStorage.removeItem('sso_token');
+      localStorage.removeItem('judge_token');
+      judgeToken = '';
+      document.getElementById('userProfile').classList.remove('show');
+      document.getElementById('ssoOverlay').classList.add('show');
+      
+      const errEl = document.getElementById('ssoJudgeError');
+      if (errEl) {
+        errEl.textContent = 'Invalid credentials or token. Please try again.';
+      }
+      setStatus('', '🔒 Acceso denegado');
+    } else {
+      setTimeout(() => {
+        const activeSSOToken = localStorage.getItem('sso_token');
+        const activeJudgeToken = localStorage.getItem('judge_token');
+        if (activeJudgeToken) {
+          judgeToken = activeJudgeToken;
+          connectWithToken(null);
+        } else if (activeSSOToken) {
+          connectWithToken(activeSSOToken);
+        } else {
+          document.getElementById('ssoOverlay').classList.add('show');
+        }
+      }, 3000);
+    }
+  };
+
+  ws.onerror = (e) => {
+    console.error('ws error', e);
+    setStatus('', '⚠ WS Error — ver consola (F12)');
+  };
+
+  ws.onmessage = (e) => {
+    if (e.data instanceof ArrayBuffer) {
+      dblog(`🔊 Audio recibido: ${e.data.byteLength} bytes → reproduciendo`);
+      playAudio(new Int16Array(e.data));
+    } else {
+      const msg = JSON.parse(e.data);
+      switch (msg.type) {
+        case 'status':
+          dblog(`STATUS: ${msg.message}`);
+          ready = true;
+          if (msg.live_ai === false) {
+            pttBtn.disabled = true;
+            pttBtn.className = 'ptt-btn';
+            pttBtn.textContent = '🔒';
+            pttBtn.style.borderColor = 'var(--muted)';
+            pttBtn.style.opacity = '0.5';
+            pttBtn.style.cursor = 'not-allowed';
+            pttHint.textContent = '🔒 Demo Shield: Micrófono inhabilitado (Modo Protegido)';
+            dblog('🔒 Modo Shield de Seguridad Activado. Grabación de voz en vivo inhabilitada para usuarios no autorizados.', 'warn');
+          } else {
+            pttBtn.disabled = false;
+            pttBtn.style.borderColor = '';
+            pttBtn.style.opacity = '';
+            pttBtn.style.cursor = '';
+            // If session was already live (reconnect), keep VAD armed; else show IDLE
+            if (vadState === 'IDLE') setVadButton('IDLE');
+          }
+          break;
+        case 'state_preview': {
+          // Real-time badge update — fires MID-STREAM while agent is speaking.
+          // Trigger phrases ("Interpreter speaking:", "Interpreter pause") appear
+          // at the START of the output, so we detect state BEFORE audio finishes.
+          const previewRole = msg.active_role || 'CONDUIT';
+          const previewEmoji = { CONDUIT:'🟢', CLARIFIER:'🟡', CULTURAL_BROKER:'🟣', RESEARCHER:'🔵', ADVOCATE:'🔴' };
+          updateSemaphore(previewRole, msg.session_memory);
+          dblog(`${previewEmoji[previewRole]||'⚪'} LIVE → ${previewRole} (en tiempo real)`);
+          break;
+        }
+        case 'researcher_start': {
+          // Agent is querying the Vertex RAG knowledge base live.
+          updateSemaphore('RESEARCHER', msg.session_memory);
+          pttHint.textContent = `🔬 Querying knowledge base: "${msg.term}"…`;
+          ivText.textContent = `Verifying "${msg.term}" in knowledge base…`;
+          ivBanner.classList.add('show');
+          dblog(`🔬 RESEARCHER → querying RAG: "${msg.term}"`);
+          break;
+        }
+        case 'researcher_result': {
+          const viaLabel = msg.via === 'adk'
+            ? `ADK${msg.agents && msg.agents.length ? ' · ' + msg.agents.join('+') : ''}`
+            : 'Direct RAG';
+          if (msg.found || msg.via === 'adk') {
+            dblog(`🧠 ${viaLabel} → "${msg.term}"${msg.source ? ' · source: ' + msg.source : ''}`, 'info');
+            ivText.textContent = `✓ "${msg.term}" verified via ${viaLabel}`;
+          } else {
+            dblog(`🔬 "${msg.term}" entry not found (${msg.error || '—'}) — professional judgment`, 'warn');
+            ivText.textContent = `⚠ "${msg.term}" not in knowledge base — interpreting with professional judgment`;
+          }
+          if (msg.session_memory) renderScratchpad(msg.session_memory);
+          break;
+        }
+        case 'session_update': {
+          // New clinical data detected — update scratchpad IMMEDIATELY.
+          // Auto-opens scratchpad if new allergy found (safety critical).
+          if (msg.session_memory) {
+            const panel = document.getElementById('scratchpadPanel');
+            const btn   = document.getElementById('scratchpadToggle');
+            renderScratchpad(msg.session_memory);
+            // Auto-open on allergy detection — interpreter must see this
+            if (msg.new_allergies && msg.new_allergies.length > 0 && !panel.classList.contains('show')) {
+              panel.classList.add('show');
+              if (btn) btn.textContent = '📋 Scratchpad ▴';
+            }
+          }
+          const allergyLog  = msg.new_allergies?.length  ? `🚨 ALERGIA: ${msg.new_allergies.join(', ')}` : '';
+          const culturalLog = msg.new_cultural_terms?.length ? `🌿 CULTURAL: ${msg.new_cultural_terms.join(', ')}` : '';
+          if (allergyLog)  dblog(allergyLog,  'warn');
+          if (culturalLog) dblog(culturalLog, 'warn');
+          break;
+        }
+        case 'transcript': {
+          const role = msg.active_role || 'CONDUIT';
+          lastTranscriptRole = role;
+          // Semaphore badge: update from transcript (authoritative final state).
+          // The badge may already show the correct state from state_preview —
+          // this confirms it with the full utterance routing.
+          updateSemaphore(role, msg.session_memory);
+          addEntry(msg.text, role);
+          // Debug telemetry: log confirmed state with full text
+          const stateEmoji = { CONDUIT:'🟢', CLARIFIER:'🟡', CULTURAL_BROKER:'🟣', RESEARCHER:'🔵', ADVOCATE:'🔴' };
+          dblog(`${stateEmoji[role]||'⚪'} CONFIRMED → ${role} | "${msg.text.substring(0,60)}${msg.text.length>60?'…':''}"`);
+          // Grade the semaphore test (if a Trigger Test scenario is running)
+          gradeSemaphoreTest(role);
+          break;
+        }
+        case 'turn_complete':
+          clearTimeout(thinkingTimeout);
+          // DO NOT call updateSemaphore here — the badge must stay on the last
+          // transcript's role so the interpreter can see CLARIFIER/ADVOCATE state.
+          // The badge resets to CONDUIT naturally when the NEXT CONDUIT transcript arrives.
+          dblog(`✔ turn_complete | last role: ${lastTranscriptRole}`);
+
+          // CLARIFIER: keep the mic hint visible — VAD will naturally re-arm and
+          // capture the clarification reply. No special auto-mic needed anymore.
+          if (lastTranscriptRole === 'CLARIFIER') {
+            clarifierMicHint.classList.add('show');
+          }
+          lastTranscriptRole = 'CONDUIT';
+
+          // VAD MODE: re-arm automatically after the agent's audio finishes.
+          // If the session was turned off (IDLE), reArmVad() is a no-op.
+          if (vadState === 'INTERPRETING') {
+            reArmVad();
+          } else if (vadState === 'IDLE') {
+            // Session off — just reset button to idle
+            isThinking = false;
+            setVadButton('IDLE');
+          }
+          break;
+        case 'intro_text':
+          // Robot intro — TEXT message from Zero Gravity Agent (no audio, ever).
+          dblog('👋 Intro text received');
+          showIntroMessage(msg.text);
+          break;
+        case 'agent_notice':
+          // Bilingual recovery notice mirrored as text (the live voice speaks it too).
+          dblog(`📢 Agent notice: ${msg.text}`);
+          addEntry(`(interpreter) ${msg.text}`, 'CLARIFIER');
+          break;
+        case 'log':
+          dblog(msg.msg, msg.level || 'info');
+          break;
+        case 'error':
+          dblog(`❌ ERROR: ${msg.message}`, 'error');
+          setStatus('', `❌ ${msg.message}`);
+          addErrorEntry(msg.message);
+          break;
+      }
+    }
+  };
+}
+
+function reconnect() {
+  if (ws) { try { ws.close(); } catch(e){} }
+  setTimeout(() => {
+    const activeToken = localStorage.getItem('sso_token');
+    connectWithToken(activeToken);
+  }, 400);
+}
+
+// ── Transcript ────────────────────────────────────────────────────────────
+const ROLE_META = {
+  CONDUIT:        { icon: '🌎', label: 'ENGLISH INTERPRETATION',  cls: '',              banner: false },
+  CLARIFIER:      { icon: '❓', label: 'CLARIFIER INTERVENTION',  cls: ' intervention', banner: true  },
+  CULTURAL_BROKER:{ icon: '🌿', label: 'CULTURAL BROKER NOTE',    cls: ' intervention', banner: true  },
+  RESEARCHER:     { icon: '🔬', label: 'RESEARCHER — VERIFYING',  cls: ' intervention', banner: true  },
+  ADVOCATE:       { icon: '🚨', label: 'ADVOCATE — SAFETY ALERT', cls: ' intervention', banner: true  },
+};
+
+function showIntroMessage(text) {
+  const empty = document.getElementById('emptyState');
+  if (empty) {
+    empty.innerHTML = `
+      <div class="empty-icon">🤖</div>
+      <div class="empty-text" style="color:var(--accent2)">Zero Gravity Agent</div>
+      <div class="empty-hint" style="max-width:560px;margin:8px auto 0;line-height:1.6">${esc(text)}</div>
+      <div class="empty-hint" style="margin-top:10px;opacity:.7">Hold the button and speak · Release to interpret</div>`;
+  } else {
+    addEntry(`(interpreter) ${text}`, 'CONDUIT');
+  }
+}
+
+function addEntry(text, role) {
+  const empty = document.getElementById('emptyState');
+  if (empty) empty.remove();
+
+  let cleanText = text;
+  let badgeHTML = '';
+
+  // Parse labels like (paciente-español), (medico-ingles), (interpreter), or (intérprete)
+  const labelRegex = /^\((paciente-español|medico-ingles|intérprete|interpreter|Patient - Spanish|Doctor - English|Interpreter - English)\)\s*(.*)/i;
+  const match = text.match(labelRegex);
+  if (match) {
+    const labelType = match[1].toLowerCase();
+    cleanText = match[2];
+    
+    let badgeClass = '';
+    let badgeText = '';
+    if (labelType.includes('paciente') || labelType.includes('patient')) {
+      badgeClass = 'badge-patient';
+      badgeText = 'paciente-español';
+    } else if (labelType.includes('medico') || labelType.includes('doctor')) {
+      badgeClass = 'badge-doctor';
+      badgeText = 'medico-ingles';
+    } else {
+      badgeClass = 'badge-interpreter';
+      badgeText = 'interpreter';
+    }
+    badgeHTML = `<span class="caption-badge ${badgeClass}">${badgeText}</span>`;
+  }
+
+  const meta = ROLE_META[role] || ROLE_META.CONDUIT;
+
+  const el = document.createElement('div');
+  el.className = 'entry';
+  el.innerHTML = `
+    <div class="entry-label">${meta.icon} ${meta.label} ${badgeHTML}</div>
+    <div class="entry-body${meta.cls}">${esc(cleanText)}</div>`;
+  txWrap.appendChild(el);
+  txWrap.scrollTop = txWrap.scrollHeight;
+
+  if (meta.banner) {
+    ivText.textContent = cleanText;
+    ivBanner.classList.add('show');
+    // CLARIFIER: show mic hint (auto-mic fires on turn_complete)
+    // ADVOCATE / CULTURAL_BROKER: banner only — no input needed
+    if (role === 'CLARIFIER') {
+      clarifierMicHint.classList.add('show');
+    }
+  } else {
+    ivBanner.classList.remove('show');
+    clarifierMicHint.classList.remove('show');
+  }
+}
+function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function addErrorEntry(msg) {
+  const empty = document.getElementById('emptyState');
+  if (empty) empty.remove();
+  const el = document.createElement('div');
+  el.className = 'entry';
+  el.innerHTML = `<div class="entry-label" style="color:var(--danger)">⚠️ ERROR</div>
+    <div class="entry-body" style="border-left-color:var(--danger);color:#fca5a5">${esc(msg)}</div>`;
+  txWrap.appendChild(el);
+  txWrap.scrollTop = txWrap.scrollHeight;
+}
+
+// Clarification via text input removed — CLARIFIER now uses auto-mic.
+// The mic opens automatically after the agent's clarifying question audio finishes.
+// The clarifierMicHint and ivBanner are cleared when the next CONDUIT entry arrives.
+
+// ── Settings Panel ────────────────────────────────────────────────────────
+function openSettings() {
+  voiceGrid.querySelectorAll('.voice-opt').forEach(el => {
+    el.classList.toggle('selected', el.dataset.voice === currentVoice);
+  });
+  settingsOverlay.classList.add('show');
+  settingsBtn.classList.add('active');
+}
+function closeSettings() {
+  settingsOverlay.classList.remove('show');
+  settingsBtn.classList.remove('active');
+}
+
+settingsBtn.addEventListener('click', openSettings);
+settingsClose.addEventListener('click', closeSettings);
+settingsCancel.addEventListener('click', closeSettings);
+
+settingsOverlay.addEventListener('click', e => { if (e.target === settingsOverlay) closeSettings(); });
+
+voiceGrid.addEventListener('click', e => {
+  const opt = e.target.closest('.voice-opt');
+  if (!opt) return;
+  voiceGrid.querySelectorAll('.voice-opt').forEach(el => el.classList.remove('selected'));
+  opt.classList.add('selected');
+});
+
+settingsSave.addEventListener('click', () => {
+  const selected = voiceGrid.querySelector('.voice-opt.selected');
+  currentVoice  = selected ? selected.dataset.voice : 'Charon';
+  closeSettings();
+  setStatus('', 'Reconnecting with new config…');
+  ready = false; pttBtn.disabled = true;
+  reconnect();
+});
+
+// ── VAD AudioWorklet — Smart Voice Activity Detection ─────────────────────
+// The interpreter's secret: detect REAL human voice vs background noise,
+// then wait for the natural "1-2-3 GO" pause (~1.5s) before interpreting.
+// No button per turn — press ONCE to arm, the agent listens forever.
+const PRE_BUFFER_MS = 500;   // 500ms pre-roll to capture onset phonemes (before voice confirmed)
+const BUFFER_SIZE = Math.ceil((PRE_BUFFER_MS / 1000) * RATE_IN); // ~8000 samples at 16kHz
+
+// ── VAD Calibration Parameters (tunable) ──────────────────────────────────
+const VAD_ABS_FLOOR    = 0.012;  // absolute min RMS to ever consider as voice
+const VAD_NOISE_MULT   = 2.8;    // voice must exceed adaptive noiseFloor × this
+const VAD_ONSET_MS     = 180;    // ms of sustained voice to confirm onset (rejects clicks/coughs)
+const VAD_SILENCE_MS   = 2000;   // ms of silence after voice → interpret (BLACK BOX: fixed 2s)
+const VAD_MIN_UTTER_MS = 250;    // utterances shorter than this are discarded
+const VAD_MAX_UTTER_MS = 30000;  // hard cap: auto-segment a non-stop monologue at this length
+                                 // so Gemini never gets a giant single turn (which goes mute)
+
+const WORKLET_SRC = `
+class VADProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    const SR = ${RATE_IN};
+    const FRAME = 128;                       // samples per process() call
+    this.frameMs = FRAME / SR * 1000;        // ~8ms per frame
+
+    // Pre-roll circular buffer (captures phonemes before onset is confirmed)
+    this.preSize = ${BUFFER_SIZE};
+    this.circular = new Float32Array(this.preSize);
+    this.writeIdx = 0;
+
+    // Calibration (overridable via 'config' message)
+    this.absFloor   = ${VAD_ABS_FLOOR};
+    this.noiseMult  = ${VAD_NOISE_MULT};
+    this.onsetNeed  = Math.ceil(${VAD_ONSET_MS}   / this.frameMs);
+    this.silenceNeed= Math.ceil(${VAD_SILENCE_MS} / this.frameMs);
+    this.minUtter   = Math.ceil(${VAD_MIN_UTTER_MS}/ this.frameMs);
+    this.maxUtter   = Math.ceil(${VAD_MAX_UTTER_MS}/ this.frameMs);
+
+    // Runtime state
+    this.armed       = false;   // session active & listening?
+    this.inVoice     = false;   // inside a voice segment?
+    this.smoothedRMS = 0;       // EWMA of frame RMS
+    this.noiseFloor  = 0.006;   // adaptive background noise estimate
+    this.voiceFrames = 0;       // consecutive voiced frames (onset counter)
+    this.silenceFrames = 0;     // consecutive silent frames during voice
+    this.utterFrames = 0;       // total frames in current utterance
+    this.meterTick   = 0;       // throttle level-meter emits
+
+    this.port.onmessage = (e) => {
+      const d = e.data;
+      if (d.type === 'arm') {
+        this.armed = true; this.inVoice = false;
+        this.voiceFrames = 0; this.silenceFrames = 0; this.utterFrames = 0;
+      } else if (d.type === 'disarm') {
+        this.armed = false; this.inVoice = false;
+        this.voiceFrames = 0; this.silenceFrames = 0;
+      } else if (d.type === 'config') {
+        if (d.silenceMs) this.silenceNeed = Math.ceil(d.silenceMs / this.frameMs);
+        if (d.absFloor)  this.absFloor = d.absFloor;
+        if (d.onsetMs)   this.onsetNeed = Math.ceil(d.onsetMs / this.frameMs);
+        if (d.noiseMult) this.noiseMult = d.noiseMult;
+        if (d.maxUtterMs) this.maxUtter = Math.ceil(d.maxUtterMs / this.frameMs);
+      }
+    };
+  }
+
+  flushPreRoll() {
+    const out = new Int16Array(this.preSize);
+    for (let i = 0; i < this.preSize; i++) {
+      const idx = (this.writeIdx + i) % this.preSize;
+      out[i] = Math.max(-32768, Math.min(32767, this.circular[idx] * 32767 | 0));
+    }
+    this.port.postMessage({ type: 'pre_buffer', data: out.buffer }, [out.buffer]);
+  }
+
+  process(inputs) {
+    const ch = inputs[0]?.[0];
+    if (!ch || !ch.length) return true;
+
+    // Compute frame RMS + always feed circular pre-roll buffer
+    let sum = 0;
+    for (let i = 0; i < ch.length; i++) {
+      const s = ch[i];
+      sum += s * s;
+      this.circular[this.writeIdx] = s;
+      this.writeIdx = (this.writeIdx + 1) % this.preSize;
+    }
+    const rms = Math.sqrt(sum / ch.length);
+    this.smoothedRMS = this.smoothedRMS * 0.82 + rms * 0.18; // EWMA smoothing
+
+    if (!this.armed) return true;
+
+    // Adaptive threshold: max of absolute floor and noiseFloor × multiplier
+    const threshold = Math.max(this.absFloor, this.noiseFloor * this.noiseMult);
+    const isVoiced = this.smoothedRMS > threshold;
+
+    // Throttled level meter for UI (every ~5 frames ≈ 40ms)
+    if (++this.meterTick >= 5) {
+      this.meterTick = 0;
+      this.port.postMessage({
+        type: 'level',
+        rms: this.smoothedRMS,
+        threshold: threshold,
+        voiced: isVoiced,
+        inVoice: this.inVoice,
+      });
+    }
+
+    if (!this.inVoice) {
+      // ── LISTENING: hunting for voice onset ──
+      if (isVoiced) {
+        this.voiceFrames++;
+        if (this.voiceFrames >= this.onsetNeed) {
+          // VOICE ONSET CONFIRMED → flush pre-roll, begin segment
+          this.inVoice = true;
+          this.silenceFrames = 0;
+          this.utterFrames = this.voiceFrames;
+          this.flushPreRoll();
+          this.port.postMessage({ type: 'voice_start' });
+        }
+      } else {
+        this.voiceFrames = 0;
+        // Update noise floor only during genuine silence (slow adaptation)
+        this.noiseFloor = this.noiseFloor * 0.95 + this.smoothedRMS * 0.05;
+      }
+    } else {
+      // ── IN VOICE: stream audio chunks live ──
+      const buf = new Int16Array(ch.length);
+      for (let i = 0; i < ch.length; i++)
+        buf[i] = Math.max(-32768, Math.min(32767, ch[i] * 32767 | 0));
+      this.port.postMessage({ type: 'chunk', data: buf.buffer }, [buf.buffer]);
+      this.utterFrames++;
+
+      // ── AUTO-SEGMENT: a non-stop monologue would be one huge turn that makes
+      // Gemini Live go mute. At max_utterance_ms we force a turn boundary so the
+      // agent interprets this chunk, then we keep listening for the rest. ──
+      if (this.utterFrames >= this.maxUtter) {
+        this.inVoice = false;
+        this.voiceFrames = 0;
+        this.silenceFrames = 0;
+        this.port.postMessage({ type: 'voice_end', valid: true, forced: true });
+      } else if (isVoiced) {
+        this.silenceFrames = 0;
+      } else {
+        this.silenceFrames++;
+        if (this.silenceFrames >= this.silenceNeed) {
+          // SILENCE THRESHOLD REACHED → end of utterance
+          this.inVoice = false;
+          this.voiceFrames = 0;
+          const valid = this.utterFrames >= this.minUtter;
+          this.port.postMessage({ type: 'voice_end', valid });
+          this.silenceFrames = 0;
+        }
+      }
+    }
+
+    return true;
+  }
+}
+registerProcessor('vad-capture', VADProcessor);
+`;
+
+async function initCapture() {
+  if (captureCtx) return;
+  captureCtx = new AudioContext({ sampleRate: RATE_IN });
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: { sampleRate: RATE_IN, channelCount: 1,
+             echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+  });
+  const blob = new Blob([WORKLET_SRC], { type: 'application/javascript' });
+  const url  = URL.createObjectURL(blob);
+  await captureCtx.audioWorklet.addModule(url);
+  URL.revokeObjectURL(url);
+  const src = captureCtx.createMediaStreamSource(stream);
+  analyser = captureCtx.createAnalyser();
+  analyser.fftSize = 256;
+  src.connect(analyser);
+  worklet = new AudioWorkletNode(captureCtx, 'vad-capture');
+  worklet.port.onmessage = ({ data }) => {
+    if (data.type === 'pre_buffer') {
+      // Onset confirmed — flush pre-roll phonemes to backend
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(data.data);
+    } else if (data.type === 'chunk') {
+      // Live voice chunks — only forward while in VOICE state
+      if (vadState === 'VOICE' && ws && ws.readyState === WebSocket.OPEN) ws.send(data.data);
+    } else if (data.type === 'voice_start') {
+      onVadVoiceStart();
+    } else if (data.type === 'voice_end') {
+      onVadVoiceEnd(data.valid);
+    } else if (data.type === 'level') {
+      onVadLevel(data);
+    }
+  };
+  src.connect(worklet);
+  worklet.connect(captureCtx.destination);
+  applyVadConfigToWorklet();  // push config.json VAD tuning into the fresh worklet
+  drawViz();
+}
+
+// ── Playback ──────────────────────────────────────────────────────────────
+let playMaster = null;  // input node for all sources: compressor -> makeup gain -> speakers
+
+function getPlayCtx() {
+  if (!playCtx || playCtx.state === 'closed') { playCtx = new AudioContext({ sampleRate: RATE_OUT }); playMaster = null; }
+  if (playCtx.state === 'suspended') playCtx.resume();
+  if (!playMaster) {
+    // Loudness chain (correct order for getting LOUDER): boost the whole signal
+    // first, THEN a limiter catches only the peaks so the boost never clips.
+    //   source -> gain(boost) -> limiter -> speakers
+    const gain = playCtx.createGain();
+    gain.gain.value = OUTPUT_GAIN;          // lift everything, incl. quiet speech
+    const limiter = playCtx.createDynamicsCompressor();
+    limiter.threshold.value = -6;           // only the loudest peaks get caught
+    limiter.knee.value      = 6;
+    limiter.ratio.value     = 12;           // hard-ish limiting above -6 dBFS
+    limiter.attack.value    = 0.002;
+    limiter.release.value   = 0.15;
+    gain.connect(limiter);
+    limiter.connect(playCtx.destination);
+    playMaster = gain;            // sources connect into the gain (chain head)
+  }
+  return playCtx;
+}
+let scheduledSources = [];   // track playing nodes so barge-in can stop them
+let suppressPlayback = false; // drop incoming audio after a barge-in
+
+function playAudio(pcm16) {
+  if (suppressPlayback) return;
+  const ctx = getPlayCtx();
+  const f32 = new Float32Array(pcm16.length);
+  for (let i = 0; i < pcm16.length; i++) f32[i] = pcm16[i] / 32768;
+  const buf = ctx.createBuffer(1, f32.length, RATE_OUT);
+  buf.copyToChannel(f32, 0);
+  const src = ctx.createBufferSource();
+  src.buffer = buf; src.connect(playMaster || ctx.destination);
+  const now = ctx.currentTime;
+  if (nextPlay < now) nextPlay = now + 0.04;
+  src.start(nextPlay);
+  nextPlay += buf.duration;
+  scheduledSources.push(src);
+  src.onended = () => {
+    const i = scheduledSources.indexOf(src);
+    if (i >= 0) scheduledSources.splice(i, 1);
+  };
+}
+
+// Stop ALL queued/playing audio immediately (barge-in)
+function stopAllPlayback() {
+  scheduledSources.forEach(s => { try { s.stop(); } catch (e) {} });
+  scheduledSources = [];
+  if (playCtx) nextPlay = playCtx.currentTime;
+}
+
+// ── VAD STATE MACHINE — The Real Interpreter ──────────────────────────────
+// ONE button, FOUR states:
+//   IDLE         → session off.  Press → arm VAD.
+//   LISTENING    → armed, hunting for voice. Auto-detects speech.
+//   VOICE        → human voice active, streaming to Gemini.
+//   INTERPRETING → agent speaking. Press → barge-in stop → back to LISTENING.
+// The button NEVER needs to be held. Press once, interpret forever.
+//
+//   [voice onset]  LISTENING → VOICE      (worklet: voice_start)
+//   [1.5s silence] VOICE → INTERPRETING   (worklet: voice_end → ptt_release)
+//   [turn_complete]INTERPRETING → LISTENING (auto re-arm after audio drains)
+
+let vadState = 'IDLE';
+let thinkingTimeout = null;
+
+function setVadButton(state) {
+  pttBtn.className = 'ptt-btn';
+  switch (state) {
+    case 'IDLE':
+      pttBtn.textContent = '🎤';
+      pttHint.textContent = 'Press to start interpreting session';
+      setStatus('online', 'ZERO GRAVITY ONLINE');
+      break;
+    case 'LISTENING':
+      pttBtn.classList.add('listening');
+      pttBtn.textContent = '👂';
+      pttHint.textContent = 'Listening... speak naturally · pause to interpret';
+      setStatus('online', 'LISTENING — auto mode');
+      break;
+    case 'VOICE':
+      pttBtn.classList.add('rec');
+      pttBtn.textContent = '🔴';
+      pttHint.textContent = 'Voice detected... pause when finished';
+      setStatus('rec', 'CAPTURING VOICE…');
+      break;
+    case 'INTERPRETING':
+      pttBtn.classList.add('thinking');
+      pttBtn.textContent = '💭';
+      pttHint.textContent = 'Zero Gravity interpreting... (click to stop)';
+      setStatus('think', 'INTERPRETING…');
+      break;
+  }
+}
+
+// ── Arm the session: press once, listen forever ──
+async function startVadSession() {
+  if (!ready) { dblog('VAD ignorado — not ready', 'warn'); return; }
+  dblog('🟢 VAD SESSION ON — armando detección de voz automática');
+  if (captureCtx && captureCtx.state === 'suspended') await captureCtx.resume();
+  await initCapture();
+  suppressPlayback = false;
+  vadState = 'LISTENING';
+  setVadButton('LISTENING');
+  worklet.port.postMessage({ type: 'arm' });
+}
+
+// ── Disarm: turn the whole session off ──
+function stopVadSession() {
+  dblog('⏹ VAD SESSION OFF — micrófono apagado');
+  if (worklet) worklet.port.postMessage({ type: 'disarm' });
+  clearTimeout(thinkingTimeout);
+  isThinking = false;
+  vadState = 'IDLE';
+  clarifierMicHint.classList.remove('show');
+  setVadButton('IDLE');
+}
+
+// ── Worklet detected voice onset → open the turn ──
+let voiceStartMs = 0;
+let longInputWarned = false;
+function onVadVoiceStart() {
+  if (vadState !== 'LISTENING') return;  // ignore if not actively listening
+  vadState = 'VOICE';
+  voiceStartMs = Date.now();
+  longInputWarned = false;
+  clarifierMicHint.classList.remove('show');
+  dblog('🎙️ VOZ DETECTADA → activity_start');
+  setVadButton('VOICE');
+  if (ws && ws.readyState === WebSocket.OPEN)
+    ws.send(JSON.stringify({ type: 'ptt_start' }));
+}
+
+// ── Worklet detected the "1-2-3 GO" silence → close the turn ──
+function onVadVoiceEnd(valid) {
+  if (vadState !== 'VOICE') return;
+  if (!valid) {
+    // Utterance too short (cough/click) — abort, keep listening, no interpretation
+    dblog('🚫 Utterance muy corta — descartada, sigo escuchando', 'warn');
+    vadState = 'LISTENING';
+    setVadButton('LISTENING');
+    if (ws && ws.readyState === WebSocket.OPEN)
+      ws.send(JSON.stringify({ type: 'ptt_release' })); // close the open activity cleanly
+    worklet.port.postMessage({ type: 'arm' });
+    return;
+  }
+  dblog('🤫 PAUSA detectada → activity_end → interpretando');
+  vadState = 'INTERPRETING';
+  isThinking = true;
+  setVadButton('INTERPRETING');
+  // Pause VAD while agent speaks (prevents agent's own voice from self-triggering)
+  worklet.port.postMessage({ type: 'disarm' });
+  if (ws && ws.readyState === WebSocket.OPEN)
+    ws.send(JSON.stringify({ type: 'ptt_release' }));
+
+  // ── MUTE-BUG RECOVERY ──
+  // If the agent goes silent (no turn_complete — long input, dropped Gemini turn,
+  // proxy hiccup), recover after the configured timeout and TELL the user.
+  const timeoutMs = (runtimeConfig.timeouts.interpret_timeout_s || 25) * 1000;
+  clearTimeout(thinkingTimeout);
+  thinkingTimeout = setTimeout(() => {
+    if (vadState === 'INTERPRETING') {
+      dblog(`⚠️ MUTE detectado — el agente no respondió en ${timeoutMs/1000}s. Recuperando…`, 'warn');
+      if (runtimeConfig.recovery?.notify_on_mute) {
+        showMuteNotice();
+      }
+      reArmVad();
+    }
+  }, timeoutMs);
+}
+
+// Visible recovery notice when the agent goes mute
+function showMuteNotice() {
+  ivText.textContent = '⚠️ El agente no respondió (posible exceso de info o red). Listo para reintentar — habla de nuevo.';
+  ivBanner.classList.add('show');
+  setTimeout(() => ivBanner.classList.remove('show'), 5000);
+}
+
+// ── Live audio level → drive the visualizer/voice indicator ──
+let vadVoiceLive = false;
+function onVadLevel(d) {
+  vadVoiceLive = d.voiced && vadState === 'VOICE';
+  // Long-input guard: very long continuous speech is the #1 cause of the
+  // agent going mute. Warn the interpreter to pause for a cleaner turn.
+  if (vadState === 'VOICE' && !longInputWarned && runtimeConfig.recovery?.long_input_warning) {
+    if (Date.now() - voiceStartMs > 22000) {  // ~22s of continuous speech
+      longInputWarned = true;
+      pttHint.textContent = '⚠️ Phrase too long — please pause so it can translate without getting lost';
+      dblog('⚠️ Long input (>22s) — suggesting pause to prevent mute', 'warn');
+    }
+  }
+}
+
+// ── Re-arm VAD after the agent finishes speaking (audio fully drained) ──
+async function reArmVad() {
+  clearTimeout(thinkingTimeout);
+  isThinking = false;
+  if (vadState === 'IDLE') return;  // session was turned off — don't re-arm
+
+  // Wait for the agent's audio to finish playing so it doesn't self-trigger VAD
+  await new Promise(resolve => {
+    const check = () => {
+      const ctx = playCtx;
+      if (!ctx || ctx.currentTime >= nextPlay - 0.05) resolve();
+      else setTimeout(check, 80);
+    };
+    setTimeout(check, 80);
+  });
+  if (vadState === 'IDLE') return;  // turned off while waiting
+  suppressPlayback = false;
+  vadState = 'LISTENING';
+  dblog('🔄 Agente terminó → VAD re-armado, escuchando de nuevo');
+  setVadButton('LISTENING');
+  if (worklet) worklet.port.postMessage({ type: 'arm' });
+}
+
+// ── Barge-in: press while INTERPRETING → stop agent, resume listening ──
+function bargeInStop() {
+  dblog('✋ BARGE-IN — deteniendo agente, vuelvo a escuchar');
+  suppressPlayback = true;
+  stopAllPlayback();
+  clearTimeout(thinkingTimeout);
+  isThinking = false;
+  // Re-arm immediately (no need to wait for drain — we killed the audio)
+  suppressPlayback = false;
+  vadState = 'LISTENING';
+  setVadButton('LISTENING');
+  if (worklet) worklet.port.postMessage({ type: 'arm' });
+}
+
+// ── Single button, context-aware ──
+function onButtonPress() {
+  if (!ready) return;
+  switch (vadState) {
+    case 'IDLE':          startVadSession(); break;
+    case 'LISTENING':     stopVadSession();  break;  // press while idle-listening = turn off
+    case 'VOICE':         stopVadSession();  break;  // press mid-speech = abort + turn off
+    case 'INTERPRETING':  bargeInStop();     break;  // press while agent talks = barge-in
+  }
+}
+
+pttBtn.addEventListener('click', onButtonPress);
+pttBtn.addEventListener('touchstart', e => { e.preventDefault(); onButtonPress(); }, { passive: false });
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !e.repeat && ready
+      && document.activeElement.tagName !== 'TEXTAREA'
+      && document.activeElement.tagName !== 'INPUT') {
+    e.preventDefault();
+    onButtonPress();
+  }
+});
+
+// ── Visualizer ────────────────────────────────────────────────────────────
+function drawViz() {
+  const W = vizCanvas.width, H = vizCanvas.height;
+  const bw = 4, gap = 4, total = BARS * (bw + gap) - gap, startX = (W - total) / 2;
+  const dataArr = new Uint8Array(analyser.frequencyBinCount);
+  function frame() {
+    requestAnimationFrame(frame);
+    analyser.getByteFrequencyData(dataArr);
+    vizCtx2d.clearRect(0, 0, W, H);
+    const live = vadState === 'VOICE';
+    for (let i = 0; i < BARS; i++) {
+      const idx = Math.floor(i * dataArr.length / BARS / 1.5);
+      const val = live ? dataArr[idx] / 255 : 0;
+      const h = Math.max(3, val * H), x = startX + i * (bw + gap), y = (H - h) / 2;
+      vizCtx2d.fillStyle = live ? `rgba(239,68,68,${.3 + val * .7})` : 'rgba(100,116,139,.2)';
+      vizCtx2d.beginPath(); vizCtx2d.roundRect(x, y, bw, h, 2); vizCtx2d.fill();
+    }
+  }
+  frame();
+}
+(function idleBars() {
+  const W = vizCanvas.width, H = vizCanvas.height;
+  const bw = 4, gap = 4, total = BARS * (bw + gap) - gap, startX = (W - total) / 2;
+  for (let i = 0; i < BARS; i++) {
+    vizCtx2d.fillStyle = 'rgba(100,116,139,.2)';
+    vizCtx2d.beginPath(); vizCtx2d.roundRect(startX + i * (bw + gap), H/2 - 1.5, bw, 3, 1.5); vizCtx2d.fill();
+  }
+})();
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+// Poll until Google's GSI library is fully loaded before touching google.accounts.
+// The <script async defer> can resolve AFTER boot() runs; using it too early threw a
+// silent error and forced a manual refresh (the "double login" bug).
+function waitForGoogleSDK(callback, attempts = 0) {
+  if (window.google && window.google.accounts) {
+    callback();
+  } else if (attempts < 100) {     // up to ~5s (100 × 50ms)
+    setTimeout(() => waitForGoogleSDK(callback, attempts + 1), 50);
+  } else {
+    dblog('⚠️ Google SDK no cargó en 5s.', 'error');
+  }
+}
+
+async function boot() {
+  await fetchConfig();
+  fetchRagStatus();       // non-blocking — updates the RAG pill when ready
+  fetchRuntimeConfig();   // non-blocking — loads VAD/timeout tuning from config.json
+
+  // ── AUTO-SAVE URL SSO TOKEN IF PASSED FROM PARENT ──
+  const urlSsoToken = new URLSearchParams(location.search).get('sso_token');
+  if (urlSsoToken) {
+    localStorage.setItem('sso_token', urlSsoToken);
+  }
+
+  // ── JUDGE FAST-PATH: a ?judge_token link skips login entirely → straight to LIVE ──
+  if (judgeToken) {
+    localStorage.setItem('judge_token', judgeToken);
+  } else {
+    judgeToken = localStorage.getItem('judge_token') || '';
+  }
+
+  if (judgeToken) {
+    dblog('🔑 Judge token detectado — acceso directo sin login.');
+    document.getElementById('ssoOverlay').classList.remove('show');
+    showProfile({ email: 'Judge Environment', picture: null });
+    connectWithToken(null);   // judgeToken is attached inside connectWithToken
+    return;
+  }
+
+  if (googleClientId) {
+    const token = localStorage.getItem('sso_token');
+    if (token) {
+      const payload = parseJwt(token);
+      const isExpired = payload && payload.exp ? (Date.now() / 1000) >= payload.exp : true;
+      if (!isExpired) {
+        const email = payload.email.toLowerCase().trim();
+        const allowedEmails = ['gabriel@singularityos-ai.com', 'gabobustos382@gmail.com'];
+        if (allowedEmails.includes(email)) {
+          dblog(`Active SSO session for ${payload.email}. Connecting...`);
+          showProfile(payload);
+          connectWithToken(token);
+          return;
+        } else {
+          dblog(`Saved token is not authorized: ${payload.email}`, 'error');
+          localStorage.removeItem('sso_token');
+        }
+      } else {
+        dblog('SSO Token expired. Log in again.', 'warn');
+        localStorage.removeItem('sso_token');
+      }
+    }
+
+    // Show the login overlay and initialize the Google widget ONLY once the SDK is ready.
+    document.getElementById('ssoOverlay').classList.add('show');
+    waitForGoogleSDK(() => {
+      google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: handleCredentialResponse,
+        auto_select: false
+      });
+      google.accounts.id.renderButton(
+        document.getElementById('gSignInBtn'),
+        { theme: "filled_dark", size: "large", width: "300", shape: "pill" }
+      );
+    });
+  } else {
+    dblog('Unprotected development mode (GOOGLE_CLIENT_ID not configured). Initializing...');
+    connectWithToken(null);
+  }
+}
+
+// ── DEMO PANEL ────────────────────────────────────────────────────────────
+const demoBtn          = document.getElementById('demoBtn');
+const demoOverlay      = document.getElementById('demoOverlay');
+const demoClose        = document.getElementById('demoClose');
+const demoGrid         = document.getElementById('demoGrid');
+const demoRunBtn       = document.getElementById('demoRunBtn');
+const demoSelectedInfo = document.getElementById('demoSelectedInfo');
+
+let demoScenarios    = {};
+let demoSelected     = null;
+let demoRunning      = false;
+const DEMO_CHUNK     = 3200; // 100ms @ 16kHz 16-bit
+
+async function loadDemoScenarios() {
+  try {
+    const res = await fetch('/api/scenarios');
+    demoScenarios = await res.json();
+    renderDemoGrid();
+  } catch(e) {
+    demoGrid.innerHTML = `<div style="color:var(--danger);font-size:12px;grid-column:1/-1">Error loading scenarios: ${e.message}</div>`;
+  }
+}
+
+function renderDemoGrid() {
+  // Trigger Test group first — it's the semaphore accuracy lab.
+  const SPECIALTY_ORDER = ['🚦 Trigger Test','Emergency','Pediatrics','OB/GYN','Mental Health','Cultural Brokering','Consent','Role Boundary'];
+  const grouped = {};
+  Object.values(demoScenarios).forEach(s => {
+    (grouped[s.specialty] = grouped[s.specialty] || []).push(s);
+  });
+
+  demoGrid.innerHTML = '';
+  const order = [...SPECIALTY_ORDER, ...Object.keys(grouped).filter(k => !SPECIALTY_ORDER.includes(k))];
+  order.forEach(sp => {
+    if (!grouped[sp]) return;
+    grouped[sp].forEach(s => {
+      const card = document.createElement('div');
+      card.className = 'demo-card';
+      card.dataset.id = s.id;
+      card.style.setProperty('--dc', s.color);
+      const expectBadge = s.expected_state
+        ? `<span class="expect-badge" style="background:${s.color}22;color:${s.color};border-color:${s.color}55">→ ${s.expected_state}</span>`
+        : '';
+      card.innerHTML = `
+        <div class="demo-card-top">
+          <span class="demo-card-emoji">${s.emoji}</span>
+          <div>
+            <div class="demo-card-label">${s.label} ${expectBadge}</div>
+            <div class="demo-card-patient">${s.patient}</div>
+          </div>
+        </div>
+        <div class="demo-card-script">"${s.english_script || s.script}"</div>`;
+      card.addEventListener('click', () => selectDemo(s.id));
+      demoGrid.appendChild(card);
+    });
+  });
+}
+
+// Semaphore test tracking
+let demoExpectedState = null;   // expected state of the running test
+let demoTestPending = false;    // waiting to grade the next transcript
+
+function selectDemo(id) {
+  if (demoRunning) return;
+  demoSelected = id;
+  demoGrid.querySelectorAll('.demo-card').forEach(c =>
+    c.classList.toggle('selected', c.dataset.id === id));
+  const s = demoScenarios[id];
+  demoSelectedInfo.textContent = s.expected_state
+    ? `${s.emoji} ${s.patient} · expects ${s.expected_state}`
+    : `${s.emoji} ${s.patient}`;
+  demoRunBtn.disabled = false;
+}
+
+// Grade a test when the agent's first state comes back
+function gradeSemaphoreTest(actualRole) {
+  if (!demoTestPending || !demoExpectedState) return;
+  demoTestPending = false;
+  const pass = actualRole === demoExpectedState;
+  const icon = pass ? '✅' : '❌';
+  const color = pass ? 'var(--success)' : 'var(--danger)';
+  dblog(`${icon} TEST: expected ${demoExpectedState} → got ${actualRole} — ${pass ? 'PASS' : 'FAIL'}`, pass ? 'info' : 'warn');
+  // Visual result entry in the transcript
+  const el = document.createElement('div');
+  el.className = 'entry';
+  el.innerHTML = `<div class="entry-label" style="color:${color}">${icon} SEMAPHORE TEST</div>
+    <div class="entry-body" style="border-left-color:${color};color:${color}">
+      Expected: <b>${demoExpectedState}</b> · Got: <b>${actualRole}</b> — ${pass ? 'CORRECT' : 'MISMATCH'}</div>`;
+  txWrap.appendChild(el);
+  txWrap.scrollTop = txWrap.scrollHeight;
+  demoExpectedState = null;
+}
+
+async function runDemo() {
+  if (!demoSelected || !ready) return;
+  if (demoRunning) { stopDemo(); return; }
+
+  demoRunning = true;
+  demoRunBtn.classList.add('running');
+  demoRunBtn.innerHTML = '■ &nbsp;Stop';
+  demoRunBtn.disabled = false;
+
+  const s = demoScenarios[demoSelected];
+  dblog(`🎭 Demo: synthesizing voice of "${s.patient}"…`);
+
+  // Arm semaphore test grading if this scenario has an expected state
+  if (s.expected_state) {
+    demoExpectedState = s.expected_state;
+    demoTestPending = true;
+    dblog(`🚦 TEST armed — waiting for state: ${s.expected_state}`);
+  } else {
+    demoExpectedState = null;
+    demoTestPending = false;
+  }
+
+  // Show patient script in transcript
+  const empty = document.getElementById('emptyState');
+  if (empty) empty.remove();
+  const patEl = document.createElement('div');
+  patEl.className = 'entry';
+  patEl.innerHTML = `
+    <div class="entry-label" style="color:#818cf8">🎭 PATIENT: ${s.patient}</div>
+    <div class="entry-body" style="border-left-color:#6366f1;font-style:italic;color:#c7d2fe">"${s.english_script || s.script}"</div>`;
+  txWrap.appendChild(patEl);
+  txWrap.scrollTop = txWrap.scrollHeight;
+
+  try {
+    // 1. Synthesize patient audio via backend
+    const synthRes = await fetch('/api/synthesize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        scenario_id: demoSelected,
+        token: localStorage.getItem('sso_token') || '',
+        judge_token: judgeToken || localStorage.getItem('judge_token') || ''
+      })
+    });
+    if (!synthRes.ok) throw new Error(`Synthesis failed: ${synthRes.status}`);
+    const pcmBuffer = await synthRes.arrayBuffer();
+    dblog(`🎤 Audio sintetizado: ${pcmBuffer.byteLength} bytes PCM 16kHz`);
+
+    if (!demoRunning) return; // stopped while synthesizing
+
+    // 2. Send PTT start
+    ws.send(JSON.stringify({ type: 'ptt_start', scenario_id: demoSelected }));
+    isThinking = false;
+    pttBtn.classList.add('rec');
+    pttBtn.textContent = '🔴';
+    setStatus('rec', `DEMO: ${s.patient}`);
+
+    // 3. Stream PCM chunks to ZGA (same as real microphone)
+    const bytes = new Uint8Array(pcmBuffer);
+    const delay = DEMO_CHUNK / (16000 * 2) * 1000;
+    for (let i = 0; i < bytes.length && demoRunning; i += DEMO_CHUNK) {
+      ws.send(bytes.slice(i, i + DEMO_CHUNK).buffer);
+      await new Promise(r => setTimeout(r, delay));
+    }
+
+    if (!demoRunning) return;
+
+    // 4. PTT release — ZGA interprets
+    ws.send(JSON.stringify({ type: 'ptt_release' }));
+    isThinking = true;
+    pttBtn.classList.remove('rec');
+    pttBtn.classList.add('thinking');
+    pttBtn.textContent = '💭';
+    setStatus('think', 'INTERPRETANDO…');
+    dblog('⏹ Demo audio sent → waiting for ZGA interpretation');
+
+  } catch(e) {
+    dblog(`❌ Demo error: ${e.message}`, 'error');
+    addErrorEntry(`Demo error: ${e.message}`);
+  } finally {
+    stopDemo(false);
+  }
+}
+
+function stopDemo(resetPTT = true) {
+  demoRunning = false;
+  demoRunBtn.classList.remove('running');
+  demoRunBtn.innerHTML = '▶ &nbsp;Run Demo';
+  demoRunBtn.disabled = !demoSelected;
+  if (resetPTT) {
+    pttBtn.className = 'ptt-btn';
+    pttBtn.textContent = '🎤';
+    isThinking = false;
+    setStatus('online', 'ZERO GRAVITY ONLINE');
+  }
+}
+
+function openDemo() {
+  if (!Object.keys(demoScenarios).length) loadDemoScenarios();
+  demoOverlay.classList.add('show');
+  demoBtn.classList.add('active');
+}
+function closeDemo() {
+  demoOverlay.classList.remove('show');
+  demoBtn.classList.remove('active');
+}
+
+demoBtn.addEventListener('click', openDemo);
+demoClose.addEventListener('click', closeDemo);
+demoOverlay.addEventListener('click', e => { if (e.target === demoOverlay) closeDemo(); });
+demoRunBtn.addEventListener('click', runDemo);
+
+boot();
+</script>
+</body>
+</html>

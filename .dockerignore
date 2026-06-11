@@ -1,0 +1,30 @@
+# NEVER bake secrets into the container image
+*.json
+!config.json
+.env
+*.env
+*.key
+*.pem
+
+# Service account keys (belt-and-suspenders — Cloud Run uses the attached SA)
+service-account.json
+singularityos-web-app-*.json
+*service_account*.json
+
+# Python cruft
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Dev / docs not needed at runtime
+HACKATON/
+DEMO_LIVE_DINAMICO/
+ENTRENAMIENTO*/
+*.md
+*.mp4
+*.spec
+deploy.ps1
+generate_audio_cache.py
+.git/
+.gitignore

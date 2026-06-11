@@ -1,0 +1,11 @@
+google-genai>=1.0.0
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-dotenv>=1.0.0
+google-auth>=2.0.0
+numpy
+requests
+google-cloud-aiplatform
+google-adk>=2.0.0
+mcp
+ddgs

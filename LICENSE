@@ -1,0 +1,26 @@
+Copyright © 2026 SingularityOS AI (Gabriel José Bustos Viloria). All Rights Reserved.
+
+PROPRIETARY AND CONFIDENTIAL.
+
+This source code and all associated materials ("the Software") are the
+proprietary and confidential property of SingularityOS AI. The Software is
+made visible to the organizers and judges of the Google for Startups AI Agents
+Challenge ("the Contest") SOLELY for the limited purpose of evaluation, testing,
+and judging during the Contest period.
+
+Visibility of this code does NOT grant any license or right to:
+  - copy, reproduce, or redistribute the Software, in whole or in part;
+  - use the Software, or any derivative of it, for any commercial or
+    non-commercial purpose;
+  - create derivative works based on the Software;
+  - reverse engineer the Software beyond what is strictly necessary for
+    Contest evaluation.
+
+All other rights are expressly reserved by SingularityOS AI. No transfer of
+ownership or intellectual property occurs by making this repository accessible
+for judging.
+
+For licensing inquiries: gabriel@singularityos-ai.com
+
+ZERO GRAVITY AGENT — HIPAA-compliant medical interpreter.
+Unauthorized use is prohibited and may result in legal action.

@@ -1,0 +1,73 @@
+{
+  "_comment": "Zero Gravity Agent — Dynamic Config. Edit values and restart the server (python main.py). Every field is optional: anything missing falls back to a safe default. You cannot break the agent by editing this file.",
+  "vad": {
+    "_comment": "Voice Activity Detection. Tune to your room. Lower silence_ms = faster but cuts people off; higher = more patient. max_utterance_ms = if someone talks this long with NO natural pause, the agent auto-segments (interprets that chunk and keeps listening) so a giant single turn never overwhelms the model and goes mute.",
+    "silence_ms": 1500,
+    "onset_ms": 180,
+    "abs_floor": 0.012,
+    "noise_mult": 3.2,
+    "min_utter_ms": 300,
+    "max_utterance_ms": 30000
+  },
+  "timeouts": {
+    "_comment": "Mute-bug recovery. interpret_timeout_s = the server-side WATCHDOG: if the agent never starts speaking within this many seconds after the user's turn ends, it plays the pre-recorded 'speak in short phrases' clip and recycles the live session. Gemini is fast (1-3s); 5s catches a true hang without cutting a slow word-lookup.",
+    "interpret_timeout_s": 5,
+    "max_reconnects": 5,
+    "reconnect_backoff_cap_s": 16,
+    "session_warn_seconds": 870
+  },
+  "recovery": {
+    "_comment": "Resilience behaviors.",
+    "notify_on_mute": true,
+    "long_input_warning": true
+  },
+  "interpretation": {
+    "_comment": "Robustness for long or noise-contaminated utterances. max_retries = silent re-attempts before the agent asks (IN THE SPEAKER'S LANGUAGE) to use short phrases. incoherence_* tune when a muted turn is treated as background-noise/cross-talk contamination (the agent says 'this is the interpreter, I cannot hear you because of background noise') instead of merely too-long. Higher incoherence_min_words = more conservative (ignores minor noise); lower max_stopword_ratio = stricter before flagging noise.",
+    "max_retries": 1,
+    "incoherence_min_words": 6,
+    "incoherence_max_stopword_ratio": 0.08
+  },
+  "triggers": {
+    "_comment": "Extra phrases that activate each role, ON TOP of the built-in detection. Add variants you discover while experimenting. These can only IMPROVE detection — they never disable the built-ins.",
+    "clarifier": [
+      "interpreter speaking",
+      "habla el intérprete",
+      "como intérprete",
+      "requests permission",
+      "interpreter requests permission"
+    ],
+    "cultural_broker": [
+      "interpreter note",
+      "nota del intérprete",
+      "cultural concept"
+    ],
+    "researcher": [
+      "let me verify",
+      "let me look up",
+      "knowledge base",
+      "déjame verificar",
+      "consultar mi base",
+      "mal de san vito",
+      "saint vitus"
+    ],
+    "advocate": [
+      "interpreter pause",
+      "pausa del intérprete",
+      "critical misunderstanding",
+      "pills stored",
+      "self-harm",
+      "suicid",
+      "better if I weren't here",
+      "no estar aquí"
+    ]
+  },
+  "nonsense_handling": "hybrid",
+  "vertex": {
+    "_comment": "RESEARCHER knowledge base. service_account_file: filename of your JSON key in this folder (leave empty to auto-detect any service_account JSON).",
+    "service_account_file": "",
+    "project": "singularityos-web-app",
+    "location": "us-central1",
+    "corpus_display_name": "zero-gravity-knowledge-base",
+    "top_k": 3
+  }
+}

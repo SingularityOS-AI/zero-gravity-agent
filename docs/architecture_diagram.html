@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Zero Gravity Agent — Architecture</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#070912;color:#edf1f8;font-family:'IBM Plex Sans',sans-serif;padding:36px}
+  .wrap{max-width:1180px;margin:0 auto}
+  h1{font-family:'Bricolage Grotesque',sans-serif;font-size:30px;font-weight:800;letter-spacing:-.6px;margin:0 0 4px}
+  .sub{color:#94a3bd;font-size:13px;text-transform:uppercase;letter-spacing:1.4px;margin-bottom:26px}
+  .card{background:#0f131f;border:1px solid #232a3d;border-radius:18px;padding:30px 24px;
+    box-shadow:0 24px 60px rgba(0,0,0,.45)}
+  .mermaid{display:flex;justify-content:center;background:transparent}
+  .legend{display:flex;gap:22px;flex-wrap:wrap;margin-top:22px;font-size:13px;font-weight:600;justify-content:center}
+  .leg{display:flex;align-items:center;gap:8px}
+  .sw{width:14px;height:14px;border-radius:4px}
+  .flow{margin-top:26px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+  .step{background:#111726;border:1px solid #232a3d;border-radius:12px;padding:13px 15px;font-size:12.5px;line-height:1.5}
+  .step b{color:#818cf8}
+  .tip{color:#64748b;font-size:12px;margin-top:18px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>⚕️ Zero Gravity Agent — System Architecture</h1>
+  <div class="sub">Net-New Autonomous Medical Interpreter · Gemini · ADK · MCP · Vertex RAG · Cloud Run</div>
+  <div class="card">
+    <pre class="mermaid">
+flowchart TB
+    P(["🎙️  Patient (ES)  &amp;  Provider (EN)"])
+
+    subgraph EDGE["🌐  BROWSER · Interpreter Console"]
+        direction LR
+        VAD["AudioWorklet VAD"]
+        HUD["Semaphore HUD<br/>5 live agent states"]
+        PAD["Clinical Scratchpad<br/>live session memory"]
+    end
+
+    subgraph CR["☁️  GOOGLE CLOUD RUN · FastAPI Gateway"]
+        WS["WebSocket Orchestrator"]
+        SEM["State Router"]
+    end
+
+    LIVE["✨  GEMINI 3.1 FLASH LIVE<br/>real-time bidirectional audio"]
+
+    subgraph ADK["🧩  ADK MULTI-AGENT REASONING · Vertex AI"]
+        ORCH["🧭 Orchestrator"]
+        A1["🔬 Researcher"]
+        A2["🌿 Cultural Broker"]
+        A3["🚨 Advocate"]
+        ORCH --> A1 &amp; A2 &amp; A3
+    end
+
+    MCP["🔌  MCP SERVER<br/>external web-search tool"]
+    RAG["📚  VERTEX AI RAG<br/>medical knowledge base"]
+
+    P -->|speaks| VAD
+    VAD -->|PCM audio| WS
+    WS <==>|real-time stream| LIVE
+    LIVE -->|announced state| SEM
+    SEM -->|RESEARCHER| ORCH
+    A1 -->|Model Context Protocol| MCP
+    A1 --> RAG
+    A2 --> RAG
+    A3 -->|allergy / dose / SI| PAD
+    ORCH -->|grounded answer| WS
+    WS -->|interpretation + state| HUD
+    WS --> PAD
+
+    classDef voice fill:#0b2b40,stroke:#38bdf8,stroke-width:2px,color:#e0f2fe
+    classDef adk fill:#241640,stroke:#a78bfa,stroke-width:2px,color:#ede9fe
+    classDef ground fill:#0c3b2a,stroke:#34d399,stroke-width:2px,color:#d1fae5
+    classDef infra fill:#3a2e0a,stroke:#fbbf24,stroke-width:2px,color:#fef3c7
+    class LIVE voice
+    class ORCH,A1,A2,A3 adk
+    class MCP,RAG ground
+    class WS,SEM infra
+    </pre>
+
+    <div class="legend">
+      <div class="leg"><span class="sw" style="background:#38bdf8"></span> Real-Time Voice — Gemini 3.1 Live</div>
+      <div class="leg"><span class="sw" style="background:#a78bfa"></span> Multi-Agent Reasoning — ADK</div>
+      <div class="leg"><span class="sw" style="background:#34d399"></span> Tools &amp; Grounding — MCP + Vertex RAG</div>
+      <div class="leg"><span class="sw" style="background:#fbbf24"></span> Infrastructure — Cloud Run</div>
+    </div>
+
+    <div class="flow">
+      <div class="step"><b>1 · Speak</b> — VAD detects the interpreter's natural pause and streams audio.</div>
+      <div class="step"><b>2 · Interpret</b> — Gemini 3.1 Live returns the spoken interpretation in real time.</div>
+      <div class="step"><b>3 · Decide</b> — the state router switches the agent's state autonomously.</div>
+      <div class="step"><b>4 · Reason</b> — on RESEARCHER, the ADK Orchestrator delegates to a specialist.</div>
+      <div class="step"><b>5 · Ground (MCP)</b> — the Researcher queries an external web tool via MCP, then Vertex RAG.</div>
+      <div class="step"><b>6 · Act</b> — the agent injects the grounded answer and writes the clinical record.</div>
+    </div>
+    <div class="tip">Export PNG: open in Chrome → right-click the diagram → "Save image as", or full-page screenshot.</div>
+  </div>
+</div>
+<script>
+  mermaid.initialize({ startOnLoad:true, theme:'dark',
+    themeVariables:{ fontSize:'15px', fontFamily:'IBM Plex Sans, sans-serif', lineColor:'#5b6b8c' }});
+</script>
+</body>
+</html>
