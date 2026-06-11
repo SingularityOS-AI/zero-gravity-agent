@@ -48,6 +48,15 @@ from state_manager import SessionState
 from semaphore import route as semaphore_route, force_conduit, ROLE_LABELS, extract_research_term, set_extra_triggers
 import rag_engine
 import adk_agents
+import messages
+from messages import (
+    INTRO_TEXT,
+    SHORT_PHRASE_SENTENCE,
+    short_phrase_directive,
+    noise_directive,
+    bilingual_clarify_directive,
+    retry_directive,
+)
 load_dotenv()
 
 logging.basicConfig(
@@ -183,61 +192,26 @@ def looks_incoherent(text: str, min_words: int = 6, max_stopword_ratio: float = 
 # No pre-recorded clips anywhere: every recovery line is injected into the live
 # session so the SAME voice (Charon/Aoede) the parties have been hearing delivers
 # it. ALL recovery lines are BILINGUAL (EN then ES) so neither party is ever lost.
-SHORT_PHRASE_SENTENCE = (
-    "Please speak in short phrases so I can interpret accurately. "
-    "Por favor, hable en frases más cortas para poder interpretar con precisión."
-)
+# Every user-facing string and directive is CENTRALIZED in messages.py (imported
+# above) — core logic contains zero hardcoded display text.
 
-
-def short_phrase_directive() -> tuple[str, str]:
-    """(inject_instruction, ui_note). Bilingual ask — short phrases, both parties informed."""
-    inject = (
-        "[SYSTEM RECOVERY] The previous utterance was too long to interpret reliably. "
-        f"Say EXACTLY this, first the English then the Spanish, and nothing else: \"{SHORT_PHRASE_SENTENCE}\""
-    )
-    return inject, SHORT_PHRASE_SENTENCE
-
-
-def noise_directive() -> tuple[str, str]:
-    """(inject_instruction, ui_note). Bilingual notice that background noise blocked interpretation."""
-    sentence = (
-        "This is the interpreter, I cannot hear you because of background noise. "
-        "Habla el intérprete: no puedo escucharle por el ruido de fondo."
-    )
-    inject = (
-        "[SYSTEM RECOVERY] The last input was contaminated by background noise or a second "
-        "speaker and cannot be interpreted safely. Do NOT attempt to translate it. "
-        f"Say EXACTLY this, first the English then the Spanish, and nothing else: \"{sentence}\""
-    )
-    return inject, sentence
-
-
-def bilingual_clarify_directive(missing_lang: str) -> str:
+async def rag_lookup_safe(term: str, timeout_s: float) -> dict:
     """
-    Forces the model to repeat its clarification request in the language it skipped,
-    in the SAME live voice — the deterministic backstop that used to be a pre-recorded
-    clip. missing_lang is "Spanish" or "English".
+    Direct Vertex RAG lookup that NEVER raises and NEVER blocks the event loop:
+    the sync network call runs in a worker thread under a hard deadline.
+    Used as the parallel fallback racer for the RESEARCHER state.
     """
-    if missing_lang == "Spanish":
-        line = ("Habla el intérprete: necesito aclarar algo antes de continuar. "
-                "¿Podría repetir o explicar lo que dijo, por favor?")
-    else:
-        line = ("Doctor, the interpreter needs to clarify something with the patient "
-                "before continuing.")
-    return (
-        "[SYSTEM RECOVERY] Your previous clarification request was delivered in only one "
-        f"language, leaving one party lost. Now say EXACTLY this, in {missing_lang}, and "
-        f"nothing else: \"{line}\""
-    )
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(rag_engine.query, term), timeout=timeout_s
+        )
+    except asyncio.TimeoutError:
+        return {"found": False, "context": "", "source": "", "term": term,
+                "error": f"RAG timeout after {timeout_s:.0f}s"}
+    except Exception as e:
+        return {"found": False, "context": "", "source": "", "term": term,
+                "error": str(e)}
 
-
-def retry_directive(transcribed_text: str) -> str:
-    """Silently re-ask the model to interpret the buffered text after a muted turn."""
-    return (
-        "[SYSTEM] The previous interpretation did not complete. Interpret the following "
-        "now, in first person, into the other language, with no commentary and no system "
-        "words: " + transcribed_text
-    )
 
 MODEL_ID = "gemini-3.1-flash-live-preview"
 
@@ -530,6 +504,15 @@ FIXED_CONFIG = {
         "incoherence_min_words": 6,
         "incoherence_max_stopword_ratio": 0.08,
     },
+    # RESEARCHER reasoning budget — the reasoning layer can NEVER hang the live
+    # session. The direct RAG lookup races IN PARALLEL with ADK, so the worst
+    # case is adk_timeout_s total and the grounded fallback is ready in ~2s.
+    # 12s covers the measured warm ADK chain (route → specialist → MCP → answer
+    # ≈ 9-11s); on miss the agent interprets with the RAG result or unaided.
+    "researcher": {
+        "adk_timeout_s": 12.0,
+        "rag_timeout_s": 4.0,
+    },
     # Built-in state triggers — hardcoded, no UI editing.
     "triggers": {
         "clarifier": [
@@ -568,12 +551,7 @@ ALLOWED_EMAILS = {"gabriel@singularityos-ai.com", "gabobustos382@gmail.com"}
 # ── Robot intro (TEXT ONLY — replaces the old intro_bilingual.pcm clip) ───────
 # Sent once per connection as a chat message from "Zero Gravity Agent" so a page
 # reset never forces anyone to sit through the same spoken speech again.
-INTRO_TEXT = (
-    "Hello — I am Zero Gravity Agent, your medical interpreter for this session. "
-    "Everything said here is confidential (HIPAA). Speak naturally in short phrases, "
-    "take turns, and pause when you finish so I can interpret. "
-    "Spanish ⇄ English, first person, with clinical safety monitoring active."
-)
+# The text itself lives in messages.py (INTRO_TEXT, imported above).
 
 # FAST START (local dev only): the Vertex RAG probe below makes a live network call
 # that adds ~15-20s to boot. Set ZGA_FAST_START=1 to SKIP the eager probes — RAG and
@@ -582,7 +560,7 @@ INTRO_TEXT = (
 _FAST_START = os.environ.get("ZGA_FAST_START", "").strip().lower() not in ("", "0", "false", "no")
 
 if _FAST_START:
-    logger.info("⚡ ZGA_FAST_START activo — omitiendo probes de RAG/ADK (carga perezosa al primer uso)")
+    logger.info("⚡ ZGA_FAST_START active — skipping RAG/ADK probes (lazy init on first use)")
     _rag_status = {"available": False, "error": "probe skipped (fast start)", "corpus": ""}
     _adk_status = {"available": False, "error": "probe skipped (fast start)", "model": ""}
 else:
@@ -591,14 +569,36 @@ else:
     if _rag_status["available"]:
         logger.info(f"🔬 RESEARCHER online — Vertex RAG corpus: {_rag_status['corpus']}")
     else:
-        logger.warning(f"🔬 RESEARCHER offline — {_rag_status['error']} (agent interpreta normal)")
+        logger.warning(f"🔬 RESEARCHER offline — {_rag_status['error']} (agent interprets normally)")
 
     # Probe the ADK multi-agent reasoning layer (lazy — first call builds it)
     _adk_status = adk_agents.status()
     if _adk_status["available"]:
         logger.info(f"🧠 ADK multi-agent online — model: {_adk_status['model']} (Vertex)")
     else:
-        logger.warning(f"🧠 ADK reasoning offline — {_adk_status['error']} (RESEARCHER usa RAG directo)")
+        logger.warning(f"🧠 ADK reasoning offline — {_adk_status['error']} (RESEARCHER uses direct RAG)")
+
+@app.on_event("startup")
+async def _prewarm_reasoning():
+    """
+    Absorb the Vertex/ADK cold start OFF the critical path. Measured: the first
+    LLM call after boot pays ~8s of TLS/auth warmup — without this, the demo's
+    FIRST real RESEARCHER hit would burn its whole budget on warmup and always
+    fall back. Runs in the background; never blocks boot; never raises.
+    """
+    if _FAST_START:
+        return
+
+    async def _warm():
+        try:
+            r = await adk_agents.run_clinical_reasoning("warmup ping", timeout_s=25.0)
+            logger.info("🔥 ADK prewarm complete — available=%s err=%s",
+                        r.get("available"), (r.get("error") or "none")[:60])
+        except Exception as e:
+            logger.warning("ADK prewarm skipped: %s", e)
+
+    asyncio.create_task(_warm())
+
 
 # Wire the FIXED triggers into the semaphore (black box — no dynamic reload)
 set_extra_triggers(FIXED_CONFIG["triggers"])
@@ -662,7 +662,7 @@ async def ws_endpoint(websocket: WebSocket):
         await websocket.accept()
         await websocket.send_json({
             "type": "status",
-            "message": "DEMO SHIELD ACTIVE",
+            "message": messages.SHIELD_STATUS,
             "live_ai": False
         })
         
@@ -732,13 +732,13 @@ async def ws_endpoint(websocket: WebSocket):
                             else:
                                 await websocket.send_json({
                                     "type": "transcript",
-                                    "text": "Modo Demostración Protegida: Grabación bloqueada. Utiliza el panel de escenarios.",
+                                    "text": messages.SHIELD_USE_SCENARIO_PANEL,
                                     "role": "CLARIFIER"
                                 })
                         else:
                             await websocket.send_json({
                                 "type": "transcript",
-                                "text": "Modo Demostración Protegida: Grabación de voz en caliente bloqueada para visitas públicas. Por favor, utiliza el panel lateral de escenarios pre-grabados.",
+                                "text": messages.SHIELD_MIC_LOCKED,
                                 "role": "CLARIFIER"
                             })
         except WebSocketDisconnect:
@@ -891,7 +891,7 @@ async def ws_endpoint(websocket: WebSocket):
             # Check if we need to reconnect proactively (approaching 15min limit)
             elapsed = asyncio.get_event_loop().time() - session_start_time
             if elapsed > session_warn:  # proactive reconnection before the limit
-                await log("⚠️ Acercándose al límite de 15 min — reconectando proactivamente")
+                await log("⚠️ Approaching the 15-min session limit — reconnecting proactively")
                 session_start_time = asyncio.get_event_loop().time()
 
             active_key = _GEMINI_KEYS[key_idx % len(_GEMINI_KEYS)]
@@ -904,9 +904,9 @@ async def ws_endpoint(websocket: WebSocket):
 
             async with client.aio.live.connect(model=MODEL_ID, config=config) as session:
                 if reconnect_attempts > 0:
-                    await log(f"♻️ Sesión reanudada exitosamente (intento #{reconnect_attempts}) — key: {key_label}")
+                    await log(f"♻️ Session resumed successfully (attempt #{reconnect_attempts}) — key: {key_label}")
                 else:
-                    await log(f"✅ Sesión Gemini establecida — modelo: {MODEL_ID} — key: {key_label}")
+                    await log(f"✅ Gemini session established — model: {MODEL_ID} — key: {key_label}")
 
                 reconnect_attempts = 0  # Reset counter on successful connection
 
@@ -928,7 +928,7 @@ async def ws_endpoint(websocket: WebSocket):
                 # A page reset or reconnect can never trap anyone in a looping intro.
                 if not intro_played:
                     intro_played = True
-                    await log("👋 Intro de texto enviada (Zero Gravity Agent)")
+                    await log("👋 Text intro sent (Zero Gravity Agent)")
                     await websocket.send_json({"type": "intro_text", "text": INTRO_TEXT})
 
                 # ── Post-reconnect recovery notice (stream-break case) ──
@@ -937,7 +937,7 @@ async def ws_endpoint(websocket: WebSocket):
                 if pending_recovery_notice:
                     pending_recovery_notice = False
                     inject, sentence = short_phrase_directive()
-                    await log("🗣 Recuperación tras reconexión → directiva bilingüe (voz live)", "warn")
+                    await log("🗣 Post-reconnect recovery → bilingual directive (live voice)", "warn")
                     await websocket.send_json({
                         "type": "state_preview",
                         "active_role": "CLARIFIER",
@@ -989,7 +989,7 @@ async def ws_endpoint(websocket: WebSocket):
                                     upd = message.session_resumption_update
                                     if upd.new_handle:
                                         current_resumption_token = upd.new_handle
-                                        await log("💾 Resumption token capturado")
+                                        await log("💾 Resumption token captured")
 
                                 sc = message.server_content
                                 if not sc:
@@ -1035,18 +1035,18 @@ async def ws_endpoint(websocket: WebSocket):
                                     # Process accumulated input: extract clinical signals
                                     last_input_text = input_buffer.strip()
                                     if last_input_text:
-                                        await log(f"👂 Input completo: {input_buffer[:120]}")
+                                        await log(f"👂 Input complete: {input_buffer[:120]}")
                                         detected = zga_session.update_from_text(input_buffer)
                                         # Push any newly captured memory to the scratchpad
                                         if any(detected.values()):
                                             if detected["new_allergies"]:
-                                                await log(f"🚨 ALERGIA DETECTADA: {detected['new_allergies']}", "warn")
+                                                await log(f"🚨 ALLERGY DETECTED: {detected['new_allergies']}", "warn")
                                             if detected["new_cultural_terms"]:
-                                                await log(f"🌿 TÉRMINO CULTURAL: {detected['new_cultural_terms']}", "warn")
+                                                await log(f"🌿 CULTURAL TERM: {detected['new_cultural_terms']}", "warn")
                                             if detected["new_symptoms"]:
-                                                await log(f"🩺 Síntoma: {detected['new_symptoms']}")
+                                                await log(f"🩺 Symptom: {detected['new_symptoms']}")
                                             if detected["new_medications"]:
-                                                await log(f"💊 Medicamento: {detected['new_medications']}")
+                                                await log(f"💊 Medication: {detected['new_medications']}")
                                             await websocket.send_json({
                                                 "type": "session_update",
                                                 "session_memory": zga_session.to_dict(),
@@ -1087,7 +1087,7 @@ async def ws_endpoint(websocket: WebSocket):
                                             interp_fail_count = 0
                                         elif interp_fail_count < _max_retries:
                                             interp_fail_count += 1
-                                            await log(f"🔁 Reintento silencioso #{interp_fail_count} (frase larga)", "warn")
+                                            await log(f"🔁 Silent retry #{interp_fail_count} (long utterance)", "warn")
                                             await speak_directive(session, retry_directive(retry_pending_text))
                                             output_buffer = ""
                                             state_preview_sent = False
@@ -1100,7 +1100,7 @@ async def ws_endpoint(websocket: WebSocket):
                                             retry_pending_text = ""
                                             interp_fail_count = 0
                                             inject, sentence = short_phrase_directive()
-                                            await log("🗣 Último recurso → directiva frases cortas (voz live)", "warn")
+                                            await log("🗣 Last resort → short-phrase directive (live voice)", "warn")
                                             await recover_with_voice(inject, sentence, "short_phrase")
                                             # HOLD: the directive generates a fresh model turn.
                                             output_buffer = ""
@@ -1115,7 +1115,7 @@ async def ws_endpoint(websocket: WebSocket):
                                     elif last_input_text and not produced:
                                         if looks_incoherent(last_input_text, _ic_min_words, _ic_max_ratio):
                                             # Defect 2 — contamination so bad the meaning is unsafe.
-                                            await log(f"🔊 Entrada contaminada (ruido/2º hablante) → aviso bilingüe voz live: {last_input_text[:70]}", "warn")
+                                            await log(f"🔊 Contaminated input (noise/2nd speaker) → bilingual live-voice notice: {last_input_text[:70]}", "warn")
                                             inject, sentence = noise_directive()
                                             await recover_with_voice(inject, sentence, "noise")
                                             output_buffer = ""
@@ -1129,7 +1129,7 @@ async def ws_endpoint(websocket: WebSocket):
                                             # Defect 1 — likely too long / transient hiccup: retry silently.
                                             interp_fail_count = 1
                                             retry_pending_text = last_input_text
-                                            await log("🔁 Interpretación vacía — reintento silencioso #1 (frase larga)", "warn")
+                                            await log("🔁 Empty interpretation — silent retry #1 (long utterance)", "warn")
                                             await speak_directive(session, retry_directive(last_input_text))
                                             output_buffer = ""
                                             state_preview_sent = False
@@ -1139,7 +1139,7 @@ async def ws_endpoint(websocket: WebSocket):
                                             continue
                                         # No retries configured → bilingual short-phrase ask, live voice.
                                         inject, sentence = short_phrase_directive()
-                                        await log("🗣 Último recurso → directiva frases cortas (voz live)", "warn")
+                                        await log("🗣 Last resort → short-phrase directive (live voice)", "warn")
                                         await recover_with_voice(inject, sentence, "short_phrase")
                                         output_buffer = ""
                                         state_preview_sent = False
@@ -1160,7 +1160,7 @@ async def ws_endpoint(websocket: WebSocket):
                                         repeat_count = 0
                                         prev_output = _norm
                                     if repeat_count >= 2:
-                                        await log("🛑 Loop detectado (misma traducción ≥3x) — reciclando sesión", "error")
+                                        await log("🛑 Loop detected (same translation ≥3x) — recycling session", "error")
                                         current_resumption_token = None  # fresh session, no replay
                                         model_busy = False
                                         ptt_active = False
@@ -1179,11 +1179,11 @@ async def ws_endpoint(websocket: WebSocket):
                                         
                                         if final_role == "CONDUIT":
                                             if is_english_input and input_to_check:
-                                                display_text = f"(medico-ingles) {input_to_check}"
+                                                display_text = f"{messages.label_for('provider')} {input_to_check}"
                                             else:
-                                                display_text = f"(paciente-español) {output_buffer.strip()}"
+                                                display_text = f"{messages.label_for('patient')} {output_buffer.strip()}"
                                         else:
-                                            display_text = f"(interpreter) {output_buffer.strip()}"
+                                            display_text = f"{messages.label_for('interpreter')} {output_buffer.strip()}"
 
                                         await websocket.send_json({
                                             "type": "transcript",
@@ -1207,7 +1207,7 @@ async def ws_endpoint(websocket: WebSocket):
                                         elif not has_en:
                                             missing = "English"
                                         if missing:
-                                            await log(f"🌐 Aclaración sin {missing} → repetición forzada en voz live", "warn")
+                                            await log(f"🌐 Clarification missing {missing} → forced live-voice repeat", "warn")
                                             bilingual_fix_pending = True
                                             await speak_directive(session, bilingual_clarify_directive(missing))
                                             # HOLD: wait for the forced repeat's own turn_complete.
@@ -1224,7 +1224,7 @@ async def ws_endpoint(websocket: WebSocket):
                                     # ── RESEARCHER: ADK multi-agent reasoning (fallback RAG), inject, HOLD vad ──
                                     if final_role == "RESEARCHER":
                                         term = extract_research_term(output_buffer) or last_input_text[:60]
-                                        await log(f"🔬 RESEARCHER → orquestador ADK: '{term}'")
+                                        await log(f"🔬 RESEARCHER → ADK orchestrator: '{term}'")
                                         await websocket.send_json({
                                             "type": "researcher_start",
                                             "term": term,
@@ -1235,13 +1235,26 @@ async def ws_endpoint(websocket: WebSocket):
                                         found, source, via, knowledge, err = False, "", "rag", "", ""
                                         agents_used: list[str] = []
 
-                                        # Reasoning is wrapped: if BOTH the ADK layer and the RAG
-                                        # fallback raise (network, Vertex outage), we must NOT crash
-                                        # the live session — the agent simply interprets unaided.
+                                        # HARD TIME BUDGET + PARALLEL RACE — the reasoning layer can
+                                        # NEVER hang the live session. The direct Vertex RAG lookup
+                                        # starts IN PARALLEL with the ADK orchestrator: if ADK answers
+                                        # in time we use it; if ADK times out or fails, the grounded
+                                        # RAG result is already waiting (~1-2s), not started cold.
+                                        # Worst case = adk_timeout_s total, then the agent interprets
+                                        # unaided. The inject below ALWAYS runs — no path leads to mute.
+                                        _r_cfg = FIXED_CONFIG["researcher"]
+                                        rag_task = asyncio.create_task(
+                                            rag_lookup_safe(term, float(_r_cfg["rag_timeout_s"]))
+                                        )
                                         try:
-                                            # 1) ADK multi-agent reasoning layer (orchestrator → specialist)
+                                            # 1) ADK multi-agent reasoning layer (orchestrator → specialist).
+                                            # Contract: bounded internally, never raises.
                                             allergies_csv = ", ".join(zga_session.allergies)
-                                            adk_res = await adk_agents.run_clinical_reasoning(term, allergies=allergies_csv)
+                                            adk_res = await adk_agents.run_clinical_reasoning(
+                                                term,
+                                                allergies=allergies_csv,
+                                                timeout_s=float(_r_cfg["adk_timeout_s"]),
+                                            )
                                             if adk_res.get("available") and adk_res.get("text"):
                                                 via = "adk"
                                                 knowledge = adk_res["text"]
@@ -1250,30 +1263,32 @@ async def ws_endpoint(websocket: WebSocket):
                                                 agents_used = adk_res.get("agents", [])
                                                 await log(f"🧠 ADK [{'+'.join(agents_used) or 'orchestrator'}]: {knowledge[:110]}")
                                             else:
-                                                # 2) Fallback to direct Vertex RAG
-                                                rag_res = await asyncio.to_thread(rag_engine.query, term)
+                                                # 2) ADK missed its deadline or errored → the parallel
+                                                # RAG racer already has (or will momentarily have) the
+                                                # grounded answer. rag_lookup_safe never raises.
+                                                rag_res = await rag_task
                                                 found = rag_res["found"]
                                                 source = rag_res.get("source", "")
                                                 knowledge = rag_res["context"] if found else ""
                                                 err = adk_res.get("error", "") or rag_res.get("error", "")
-                                                await log(f"🔬 RAG fallback — found={found} ({err})", "warn")
+                                                await log(f"🔬 RAG fallback (parallel) — found={found} ({err})", "warn")
                                         except Exception as e:
                                             err = str(e)
-                                            await log(f"⚠️ RESEARCHER reasoning falló ({err}) — interpreto sin base", "error")
+                                            await log(f"⚠️ RESEARCHER reasoning failed ({err}) — interpreting unaided", "error")
+                                        finally:
+                                            # Never leak the racer: consume it whatever happened above.
+                                            if not rag_task.done():
+                                                rag_task.cancel()
+                                            try:
+                                                await rag_task
+                                            except (asyncio.CancelledError, Exception):
+                                                pass
 
                                         if knowledge:
                                             zga_session.record_clarified_term(term, knowledge[:160])
-                                            inject = (
-                                                f"[KNOWLEDGE BASE RESULT for '{term}']: {knowledge}\n\n"
-                                                f"Now deliver the accurate interpretation using this confirmed meaning. "
-                                                f"Do NOT mention the lookup or the knowledge base again."
-                                            )
+                                            inject = messages.knowledge_inject(term, knowledge)
                                         else:
-                                            inject = (
-                                                f"[KNOWLEDGE BASE: no confirmed entry for '{term}'.] "
-                                                f"Use your best professional judgment and interpret the message normally now. "
-                                                f"Do NOT mention the knowledge base."
-                                            )
+                                            inject = messages.knowledge_miss_inject(term)
                                         await websocket.send_json({
                                             "type": "researcher_result",
                                             "term": term,
@@ -1318,7 +1333,7 @@ async def ws_endpoint(websocket: WebSocket):
                                         "session_memory": zga_session.to_dict(),
                                     })
 
-                            await log("🔄 Generador receive() terminó — reiniciando")
+                            await log("🔄 receive() generator ended — restarting")
 
                         except Exception as e:
                             if not stop_event.is_set():
@@ -1328,10 +1343,15 @@ async def ws_endpoint(websocket: WebSocket):
                                 # reconnected session tells the user to use short phrases.
                                 # Skip when the browser itself went away (no point notifying).
                                 _es = str(e).lower()
-                                if not any(s in _es for s in (
+                                if any(s in _es for s in (
                                     "websocket.send", "websocket.close", "disconnect",
                                     "response already completed", "connectionclosed",
                                 )):
+                                    # The BROWSER is gone — stop the whole session now.
+                                    # Recycling Gemini for a dead client only spins an
+                                    # error loop and burns quota.
+                                    stop_event.set()
+                                else:
                                     pending_recovery_notice = True
                                     # CRITICAL: drop the resumption handle on an ERROR reconnect.
                                     # Resuming a session that just aborted (e.g. 1008) replays the
@@ -1381,22 +1401,38 @@ async def ws_endpoint(websocket: WebSocket):
                                 if len(audio_agg) >= AUDIO_AGG_BYTES:
                                     audio_chunks_sent += 1
                                     if audio_chunks_sent % 10 == 1:
-                                        await log(f"🎤 Audio agregado #{audio_chunks_sent} → Gemini ({len(audio_agg)} bytes)")
+                                        await log(f"🎤 Audio batch #{audio_chunks_sent} → Gemini ({len(audio_agg)} bytes)")
                                     await _flush_audio()
 
                             elif "text" in msg:
-                                data = json.loads(msg["text"])
+                                # A malformed client message must NEVER kill the session.
+                                try:
+                                    data = json.loads(msg["text"])
+                                    if not isinstance(data, dict):
+                                        raise ValueError("client message is not an object")
+                                except (json.JSONDecodeError, TypeError, ValueError) as e:
+                                    await log(f"⚠️ Malformed client message dropped ({e})", "warn")
+                                    continue
                                 t = data.get("type")
 
                                 if t == "ptt_start":
                                     if model_busy:
-                                        await log("⚠️ PTT start ignorado — modelo generando respuesta", "warn")
+                                        await log("⚠️ PTT start ignored — model is generating a response", "warn")
+                                        # Tell the UI explicitly so it can show progress
+                                        # instead of looking unresponsive.
+                                        try:
+                                            await websocket.send_json({
+                                                "type": "busy",
+                                                "text": messages.MODEL_BUSY_NOTICE,
+                                            })
+                                        except Exception:
+                                            pass
                                         continue
                                     audio_chunks_sent = 0
                                     audio_agg.clear()  # fresh turn
                                     ptt_active = True
                                     ptt_start_time = asyncio.get_event_loop().time()
-                                    await log("▶ PTT start → activity_start enviado a Gemini")
+                                    await log("▶ PTT start → activity_start sent to Gemini")
                                     await session.send_realtime_input(activity_start=types.ActivityStart())
 
                                 elif t == "ptt_release":
@@ -1434,9 +1470,9 @@ async def ws_endpoint(websocket: WebSocket):
                 # receiver() only runs if turn_complete arrives. But the worst failure is when
                 # turn_complete NEVER arrives — the model just hangs in "interpreting". So this
                 # task fires on TIME, not on events: if the model has not started speaking within
-                # _wd_timeout seconds of the user finishing, it plays the pre-recorded
-                # "speak in short phrases" clip (in the speaker's language) and recycles the
-                # live session so the next turn starts clean.
+                # _wd_timeout seconds of the user finishing, it shows the bilingual notice as
+                # text, recycles the live session, and the fresh session speaks the notice in
+                # its OWN live voice — so the next turn starts clean.
                 async def watchdog():
                     nonlocal awaiting_response, model_busy, ptt_active, active_role
                     nonlocal current_resumption_token, pending_recovery_notice
@@ -1454,7 +1490,7 @@ async def ws_endpoint(websocket: WebSocket):
                         # The model is mute and cannot speak, so: 1) show the bilingual
                         # notice as TEXT right now, 2) recycle the session, 3) the fresh
                         # session speaks it in the SAME live voice (pending_recovery_notice).
-                        await log(f"⏱ Watchdog: agente mudo >{_wd_timeout:.0f}s — recuperando (texto + voz live tras reciclar)", "warn")
+                        await log(f"⏱ Watchdog: agent mute >{_wd_timeout:.0f}s — recovering (text now + live voice after recycle)", "warn")
                         awaiting_response = False
                         pending_recovery_notice = True
                         zga_session.lock_state("CLARIFIER")
@@ -1501,8 +1537,33 @@ async def ws_endpoint(websocket: WebSocket):
                     except asyncio.CancelledError:
                         pass
 
+                # ── POST-MORTEM: why did we stop? ──
+                # Task exceptions were previously swallowed here, so a browser
+                # disconnect inside sender() leaked into a pointless Gemini
+                # reconnect cycle against a dead socket. Inspect every finished
+                # task: client gone → full stop; anything else → outer loop
+                # decides (reconnect with backoff).
+                for task in done:
+                    exc = task.exception() if not task.cancelled() else None
+                    if exc is None:
+                        continue
+                    if isinstance(exc, WebSocketDisconnect):
+                        logger.info("Client disconnected — shutting down session cleanly")
+                        stop_event.set()
+                        break
+                    _es = str(exc).lower()
+                    if any(s in _es for s in (
+                        "websocket.send", "websocket.close", "disconnect",
+                        "response already completed", "connectionclosed",
+                    )):
+                        logger.info("Client socket dead (%s) — shutting down session", exc)
+                        stop_event.set()
+                        break
+                    # Gemini-side failure → let the outer loop reconnect.
+                    logger.error("Session task ended with error: %s", exc)
+
         except WebSocketDisconnect:
-            await log("Cliente desconectado — cerrando sesión Gemini")
+            await log("Client disconnected — closing Gemini session")
             break  # Clean exit initiated by the client browser
 
         except Exception as e:
@@ -1516,7 +1577,7 @@ async def ws_endpoint(websocket: WebSocket):
                 "websocket.send", "websocket.close", "response already completed",
                 "disconnect", "connectionclosed", "cannot call \"send\"",
             )):
-                logger.info("Cliente WebSocket cerrado — terminando sesión (sin reconectar)")
+                logger.info("Client WebSocket closed — ending session (no reconnect)")
                 stop_event.set()
                 break
 
@@ -1524,14 +1585,14 @@ async def ws_endpoint(websocket: WebSocket):
             if ("quota" in err_str or "billing" in err_str or "api_key" in err_str) and len(_GEMINI_KEYS) > 1:
                 next_label = "personal" if key_idx % len(_GEMINI_KEYS) == 0 else "LLC"
                 key_idx += 1
-                await log(f"⚡ Quota/auth error en key {key_label} — cambiando a key {next_label}", "error")
+                await log(f"⚡ Quota/auth error on key {key_label} — switching to key {next_label}", "error")
                 session_start_time = asyncio.get_event_loop().time()
                 continue  # Retry immediately with new key, don't burn a reconnect attempt
             reconnect_attempts += 1
             if reconnect_attempts < max_reconnect_attempts:
                 # Execute Exponential Backoff and Transparent Resumption
                 backoff = min(2 ** reconnect_attempts, backoff_cap)  # Cap from config
-                await log(f"❌ Session error: {e} — reconectando en {backoff}s (intento #{reconnect_attempts})", "error")
+                await log(f"❌ Session error: {e} — reconnecting in {backoff}s (attempt #{reconnect_attempts})", "error")
                 # A mid-interpretation crash → notify the user (short phrases) once back up.
                 pending_recovery_notice = True
                 # Fresh session on error (no resumption replay → no infinite-loop repeat).

@@ -106,9 +106,9 @@ def _try_init() -> None:
     #    locally (with key) and deployed (no key file, ADC from runtime SA).
     if os.path.exists(SERVICE_ACCOUNT_PATH):
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = SERVICE_ACCOUNT_PATH
-        logger.info("RAG: usando service account local (%s)", os.path.basename(SERVICE_ACCOUNT_PATH))
+        logger.info("RAG: using local service account (%s)", os.path.basename(SERVICE_ACCOUNT_PATH))
     else:
-        logger.info("RAG: sin key file local — usando ADC (Cloud Run / gcloud auth)")
+        logger.info("RAG: no local key file — using ADC (Cloud Run / gcloud auth)")
 
     # 2) Import SDK (new API first, fall back to preview)
     try:

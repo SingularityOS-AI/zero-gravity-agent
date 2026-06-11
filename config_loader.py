@@ -194,9 +194,9 @@ def save_config(updates: dict) -> dict:
     try:
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(merged_raw, f, indent=2, ensure_ascii=False)
-        logger.info("⚙️ config.json actualizado desde la UI")
+        logger.info("⚙️ config.json updated from the UI")
     except Exception as e:
-        logger.error("No se pudo escribir config.json: %s", e)
+        logger.error("Could not write config.json: %s", e)
 
     # Force a clean re-read (also re-clamps anything out of range)
     return get_config(force=True)

@@ -12,6 +12,7 @@ COPY rag_engine.py .
 COPY adk_agents.py .
 COPY mcp_server.py .
 COPY config_loader.py .
+COPY messages.py .
 # Only the app config — NEVER the service account JSON (Cloud Run uses the
 # attached runtime service account via ADC, not a key file in the image).
 COPY config.json .

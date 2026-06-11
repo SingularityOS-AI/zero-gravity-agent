@@ -1020,6 +1020,7 @@ let worklet    = null;
 let analyser   = null;
 let nextPlay   = 0;
 let isThinking = false;
+let researcherBannerTimeout = null;
 let ready      = false;
 let currentVoice  = 'Charon';
 
@@ -1262,7 +1263,7 @@ function connectWithToken(token) {
       if (errEl) {
         errEl.textContent = 'Invalid credentials or token. Please try again.';
       }
-      setStatus('', '🔒 Acceso denegado');
+      setStatus('', '🔒 Access denied');
     } else {
       setTimeout(() => {
         const activeSSOToken = localStorage.getItem('sso_token');
@@ -1289,7 +1290,14 @@ function connectWithToken(token) {
       dblog(`🔊 Audio recibido: ${e.data.byteLength} bytes → reproduciendo`);
       playAudio(new Int16Array(e.data));
     } else {
-      const msg = JSON.parse(e.data);
+      // A malformed server message must NEVER kill the message pump.
+      let msg;
+      try {
+        msg = JSON.parse(e.data);
+      } catch (err) {
+        dblog(`⚠️ Malformed server message dropped (${err})`, 'warn');
+        return;
+      }
       switch (msg.type) {
         case 'status':
           dblog(`STATUS: ${msg.message}`);
@@ -1301,7 +1309,7 @@ function connectWithToken(token) {
             pttBtn.style.borderColor = 'var(--muted)';
             pttBtn.style.opacity = '0.5';
             pttBtn.style.cursor = 'not-allowed';
-            pttHint.textContent = '🔒 Demo Shield: Micrófono inhabilitado (Modo Protegido)';
+            pttHint.textContent = '🔒 Demo Shield: microphone disabled (protected mode)';
             dblog('🔒 Modo Shield de Seguridad Activado. Grabación de voz en vivo inhabilitada para usuarios no autorizados.', 'warn');
           } else {
             pttBtn.disabled = false;
@@ -1328,10 +1336,38 @@ function connectWithToken(token) {
           pttHint.textContent = `🔬 Querying knowledge base: "${msg.term}"…`;
           ivText.textContent = `Verifying "${msg.term}" in knowledge base…`;
           ivBanner.classList.add('show');
+          // SAFETY NET: if researcher_result never arrives (server recycle,
+          // network drop), the banner must not stay on screen forever.
+          clearTimeout(researcherBannerTimeout);
+          researcherBannerTimeout = setTimeout(() => {
+            ivBanner.classList.remove('show');
+            dblog('⚠️ Researcher result not received in time — banner auto-cleared', 'warn');
+          }, 25000);
+          // The agent is LEGITIMATELY busy researching (server budget ≤12s +
+          // informed turn). Suspend the 5s mute watchdog so it cannot fire
+          // mid-research and re-arm the VAD against the agent's own voice.
+          clearTimeout(thinkingTimeout);
+          thinkingTimeout = setTimeout(() => {
+            if (vadState === 'INTERPRETING') {
+              dblog('⚠️ Research window expired without a result — recovering', 'warn');
+              showMuteNotice();
+              reArmVad();
+            }
+          }, 25000);
           dblog(`🔬 RESEARCHER → querying RAG: "${msg.term}"`);
           break;
         }
         case 'researcher_result': {
+          clearTimeout(researcherBannerTimeout);
+          // Research is done — give the INFORMED turn its own fresh mute window.
+          clearTimeout(thinkingTimeout);
+          thinkingTimeout = setTimeout(() => {
+            if (vadState === 'INTERPRETING') {
+              dblog('⚠️ Informed turn never arrived — recovering', 'warn');
+              showMuteNotice();
+              reArmVad();
+            }
+          }, 15000);
           const viaLabel = msg.via === 'adk'
             ? `ADK${msg.agents && msg.agents.length ? ' · ' + msg.agents.join('+') : ''}`
             : 'Direct RAG';
@@ -1412,6 +1448,12 @@ function connectWithToken(token) {
           // Bilingual recovery notice mirrored as text (the live voice speaks it too).
           dblog(`📢 Agent notice: ${msg.text}`);
           addEntry(`(interpreter) ${msg.text}`, 'CLARIFIER');
+          break;
+        case 'busy':
+          // Server rejected ptt_start because a turn is still in flight —
+          // surface it so the UI never looks frozen or unresponsive.
+          dblog(`⏳ ${msg.text || 'Interpretation in progress'}`, 'warn');
+          pttHint.textContent = `⏳ ${msg.text || 'Interpretation in progress…'}`;
           break;
         case 'log':
           dblog(msg.msg, msg.level || 'info');
@@ -1934,7 +1976,7 @@ function onVadVoiceEnd(valid) {
 
 // Visible recovery notice when the agent goes mute
 function showMuteNotice() {
-  ivText.textContent = '⚠️ El agente no respondió (posible exceso de info o red). Listo para reintentar — habla de nuevo.';
+  ivText.textContent = '⚠️ The agent did not respond (input too long or a network hiccup). Ready to retry — speak again.';
   ivBanner.classList.add('show');
   setTimeout(() => ivBanner.classList.remove('show'), 5000);
 }

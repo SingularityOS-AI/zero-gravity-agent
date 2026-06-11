@@ -35,6 +35,10 @@ def web_search(query: str, max_results: int = 4) -> str:
     """
     try:
         from ddgs import DDGS
+        # A slow search backend must never eat the interpreter's research budget.
+        # The REAL bound is upstream: the MCP toolset (timeout=20) and the ADK
+        # orchestrator deadline (run_clinical_reasoning timeout_s=12) cancel this
+        # whole chain, after which main.py degrades to the Vertex knowledge base.
         results = DDGS().text(query, max_results=max(1, min(max_results, 6)))
     except Exception as e:
         return f"SEARCH_ERROR: {e}"
